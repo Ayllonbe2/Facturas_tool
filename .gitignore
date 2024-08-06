@@ -1,0 +1,6 @@
+invoice*
+*.pdf
+template.pdf
+app/main/invoices.db
+package-lock.json
+node_modules
