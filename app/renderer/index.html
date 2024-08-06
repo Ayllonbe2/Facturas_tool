@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Facturas</title>
+</head>
+<body>
+  <h1>Generador de Facturas</h1>
+  
+  <h2>Agregar Cliente</h2>
+  <form id="customer-form">
+    <input type="text" id="customer-name" placeholder="Nombre" required>
+    <input type="email" id="customer-email" placeholder="Email" required>
+    <input type="tel" id="customer-phone" placeholder="Teléfono" required>
+    <button type="submit">Agregar Cliente</button>
+  </form>
+  
+  <h2>Generar Factura</h2>
+  <form id="invoice-form">
+    <select id="customer-select"></select>
+    <input type="text" id="amount" placeholder="Monto" required>
+    <button type="submit">Generar Factura</button>
+  </form>
+  
+  <script src="renderer.js"></script>
+</body>
+</html>
