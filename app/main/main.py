@@ -112,6 +112,41 @@ def get_invoices():
         return []
     return [{"id": invoice[0], "customer": invoice[1], "amount": invoice[2], "date": invoice[3]} for invoice in invoices]
 
+@app.put('/update_customer')
+def update_customer(customer: Customer):
+    logger.info(f"Updating customer data: {customer}")
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("""
+        UPDATE customers 
+        SET name = ?, address = ?, city = ?, postal_code = ?, country = ?, cif = ?, phone = ?, email = ? 
+        WHERE id = ?
+    """, (customer.name, customer.address, customer.city, customer.postal_code, customer.country, customer.cif, customer.phone, customer.email, customer.id))
+    conn.commit()
+    conn.close()
+    return {"status": "success", "customer_id": customer.id}
+
+@app.get('/get_customer/{customer_id}', response_model=Customer)
+def get_customer(customer_id: int):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("SELECT * FROM customers WHERE id = ?", (customer_id,))
+    customer = c.fetchone()
+    conn.close()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return {
+        "id": customer[0], 
+        "name": customer[1], 
+        "address": customer[2], 
+        "city": customer[3], 
+        "postal_code": customer[4], 
+        "country": customer[5], 
+        "cif": customer[6], 
+        "phone": customer[7], 
+        "email": customer[8]
+    }
+
 def get_customer_by_id(customer_id):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()

@@ -90,6 +90,7 @@ function viewAllCustomers() {
                 <td>${customer.cif}</td>
                 <td>${customer.phone}</td>
                 <td>${customer.email}</td>
+                <td><button onclick="editCustomer(${customer.id})">Editar</button></td>
             `;
             clientsTableBody.appendChild(row);
         });
@@ -126,6 +127,48 @@ function viewAllInvoices() {
         }
     });
 }
+
+// Función para editar un cliente
+function editCustomer(customerId) {
+  ipcRenderer.send('get-customer', customerId);
+  ipcRenderer.on('customer-data', (event, customer) => {
+    document.getElementById('edit-customer-id').value = customer.id;
+    document.getElementById('edit-customer-name').value = customer.name;
+    document.getElementById('edit-customer-address').value = customer.address;
+    document.getElementById('edit-customer-city').value = customer.city;
+    document.getElementById('edit-customer-postal-code').value = customer.postal_code;
+    document.getElementById('edit-customer-country').value = customer.country;
+    document.getElementById('edit-customer-cif').value = customer.cif;
+    document.getElementById('edit-customer-phone').value = customer.phone;
+    document.getElementById('edit-customer-email').value = customer.email;
+    showSection('edit-client');
+  });
+}
+
+// Manejar el formulario para editar clientes
+document.getElementById('edit-customer-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+
+  const id = document.getElementById('edit-customer-id').value;
+  const name = document.getElementById('edit-customer-name').value;
+  const address = document.getElementById('edit-customer-address').value;
+  const city = document.getElementById('edit-customer-city').value;
+  const postal_code = document.getElementById('edit-customer-postal-code').value;
+  const country = document.getElementById('edit-customer-country').value;
+  const cif = document.getElementById('edit-customer-cif').value;
+  const phone = document.getElementById('edit-customer-phone').value;
+  const email = document.getElementById('edit-customer-email').value;
+
+  const updatedCustomer = { id, name, address, city, postal_code, country, cif, phone, email };
+  
+  console.log('Sending updated customer data:', updatedCustomer);
+  
+  ipcRenderer.send('update-customer', updatedCustomer);
+  
+  ipcRenderer.on('customer-updated', () => {
+    showSection('view-clients');
+  });
+});
 
 // Cargar clientes al iniciar
 ipcRenderer.send('load-customers');

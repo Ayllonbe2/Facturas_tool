@@ -141,6 +141,21 @@
           </tbody>
         </table>
       </div>
+      <div id="edit-client" class="section">
+        <h2>Editar Cliente</h2>
+        <form id="edit-customer-form">
+          <input type="hidden" id="edit-customer-id">
+          <input type="text" id="edit-customer-name" placeholder="Nombre" required>
+          <input type="text" id="edit-customer-address" placeholder="Dirección" required>
+          <input type="text" id="edit-customer-city" placeholder="Ciudad" required>
+          <input type="text" id="edit-customer-postal-code" placeholder="Código Postal" required>
+          <input type="text" id="edit-customer-country" placeholder="País" required>
+          <input type="text" id="edit-customer-cif" placeholder="CIF" required>
+          <input type="tel" id="edit-customer-phone" placeholder="Teléfono" required>
+          <input type="email" id="edit-customer-email" placeholder="Email" required>
+          <button type="submit">Guardar Cambios</button>
+        </form>
+      </div>
       <div id="view-invoices" class="section">
         <h2>Ver Facturas Emitidas</h2>
         <table id="invoices-table">

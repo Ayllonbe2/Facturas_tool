@@ -118,6 +118,38 @@ app.on('ready', () => {
       });
     });
 
+    // Handle the request to get customer data
+ipcMain.on('get-customer', (event, customerId) => {
+  console.log('Sending get-customer request:', customerId);
+  request.get(`http://127.0.0.1:8000/get_customer/${customerId}`, (error, res, body) => {
+    if (error) {
+      console.error('Error getting customer:', error);
+      return;
+    }
+    const customer = JSON.parse(body);
+    mainWindow.webContents.send('customer-data', customer);
+  });
+});
+
+// Handle the request to update customer data
+ipcMain.on('update-customer', (event, customer) => {
+  console.log('Sending update-customer request:', customer);
+  request.put('http://127.0.0.1:8000/update_customer', {
+    json: customer
+  }, (error, res, body) => {
+    if (error) {
+      console.error('Error updating customer:', error);
+      return;
+    }
+    console.log(`Update customer statusCode: ${res.statusCode}`);
+    console.log('Response:', body);
+    
+    // After updating a customer, reload the customers
+    loadCustomers();
+    mainWindow.webContents.send('customer-updated');
+  });
+});
+
     function loadCustomers() {
       request.get('http://127.0.0.1:8000/get_customers', (error, res, body) => {
         if (error) {
