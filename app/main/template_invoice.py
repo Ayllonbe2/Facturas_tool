@@ -1,69 +1,285 @@
-from fpdf import Template
-import datetime
+from weasyprint import HTML
+import os
+import base64
+from datetime import datetime
 import calendar
-from dateutil.relativedelta import relativedelta
-
-#this will define the ELEMENTS that will compose the template. 
-elements = [
-    { 'name': 'company_logo', 'type': 'I', 'x1': 20.0, 'y1': 17.0, 'x2': 60.0, 'y2': 57.0, 'font': None, 'size': 0.0, 'bold': 0, 'italic': 0, 'underline': 0, 'align': 'C', 'text': 'logo', 'priority': 2, 'multiline': False},
-    { 'name': 'company_name', 'type': 'T', 'x1': 20.0, 'y1': 60, 'x2': 70, 'y2': 70, 'font': 'Arial', 'size': 10, 'bold': 1, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'company_address', 'type': 'T', 'x1': 20.0, 'y1': 70, 'x2': 70, 'y2': 75, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': True},
-    { 'name': 'company_CIF', 'type': 'T', 'x1': 20.0, 'y1': 80, 'x2': 70, 'y2': 85, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'company_phone', 'type': 'T', 'x1': 20.0, 'y1': 85, 'x2': 70, 'y2': 90, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'company_email', 'type': 'T', 'x1': 20.0, 'y1': 90, 'x2': 70, 'y2': 95, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'factura', 'type': 'T', 'x1': 100.0, 'y1': 17.0, 'x2': 200.0, 'y2': 27.0, 'font': 'Arial', 'size': 18, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'C', 'text': '', 'priority': 2, 'multiline': False, 'text':'Factura'},
-    { 'name': 'factura_id', 'type': 'T', 'x1': 100.0, 'y1': 27.0, 'x2': 200.0, 'y2': 37.0, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'C', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'date_today', 'type': 'T', 'x1': 125.0, 'y1': 70, 'x2': 250, 'y2': 75, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': True},
-    { 'name': 'terminos', 'type': 'T', 'x1': 125.0, 'y1': 75, 'x2': 250, 'y2': 80, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': True},
-    { 'name': 'end_date', 'type': 'T', 'x1': 125.0, 'y1': 80, 'x2': 250, 'y2': 85, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': True},
-    { 'name': 'cliente_name', 'type': 'T', 'x1': 20.0, 'y1': 105, 'x2': 70, 'y2': 110, 'font': 'Arial', 'size': 10, 'bold': 1, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'cliente_address', 'type': 'T', 'x1': 20.0, 'y1': 110, 'x2': 70, 'y2': 115, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': True},
-    { 'name': 'cliente_CIF', 'type': 'T', 'x1': 20.0, 'y1': 125, 'x2': 70, 'y2': 130, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'cliente_phone', 'type': 'T', 'x1': 20.0, 'y1': 130, 'x2': 70, 'y2': 135, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    { 'name': 'cliente_email', 'type': 'T', 'x1': 20.0, 'y1': 135, 'x2': 70, 'y2': 140, 'font': 'Arial', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0,'align': 'L', 'text': '', 'priority': 2, 'multiline': False},
-    #{ 'name': 'multline_text', 'type': 'T', 'x1': 20, 'y1': 100, 'x2': 40, 'y2': 105, 'font': 'helvetica', 'size': 10, 'bold': 0, 'italic': 0, 'underline': 0, 'background': 0x88ff00, 'align': 'C', 'text': 'Lorem ipsum dolor sit amet, consectetur adipisici elit', 'priority': 2, 'multiline': True, 'wrapmode': 'WORD'},
-    #{ 'name': 'box', 'type': 'B', 'x1': 15.0, 'y1': 15.0, 'x2': 185.0, 'y2': 260.0, 'font': 'helvetica', 'size': 0.0, 'bold': 0, 'italic': 0, 'underline': 0, 'align': 'C', 'text': None, 'priority': 0, 'multiline': False},
-    #{ 'name': 'box_x', 'type': 'B', 'x1': 95.0, 'y1': 15.0, 'x2': 105.0, 'y2': 25.0, 'font': 'helvetica', 'size': 0.0, 'bold': 1, 'italic': 0, 'underline': 0, 'align': 'C', 'text': None, 'priority': 2, 'multiline': False},
-    #{ 'name': 'line1', 'type': 'L', 'x1': 100.0, 'y1': 25.0, 'x2': 100.0, 'y2': 57.0, 'font': 'helvetica', 'size': 0, 'bold': 0, 'italic': 0, 'underline': 0, 'align': 'C', 'text': None, 'priority': 3, 'multiline': False},
-    { 'name': 'barcode', 'type': 'BC', 'x1': 20.0, 'y1': 246.5, 'x2': 140.0, 'y2': 254.0, 'font': 'Interleaved 2of5 NT', 'size': 0.75, 'bold': 0, 'italic': 0, 'underline': 0, 'align': 'C', 'text': '200000000001000159053338016581200810081', 'priority': 3, 'multiline': False},
-]
-
-#here we instantiate the template
-f = Template(format="A4", elements=elements,
-             title="Sample Invoice")
-f.add_page()
-
-#we FILL some of the fields of the template with the information we want
-#note we access the elements treating the template instance as a "dict"
-f["company_name"] = "Acanata S.L."
-f["company_address"] = "Rivas Vaciamadrid\n28523, España"
-f["company_CIF"] = "CIF: B56285562"
-f["company_phone"] = "tlf: 608236720"
-f["company_email"] = "email: a.martinez@acanata.es"
-f["company_logo"] = "app/assets/acanata.png"
-
-one_year_from_now = datetime.datetime.now() + relativedelta(years=1)
-date_formated = one_year_from_now.strftime("%d/%m/%Y")
-
-f["date_today"] = "Fecha de la factura:\t "+str(date_formated)
-f["terminos"] = "Terminos:\t Vencimiento a final de mes"
-
-res = calendar.monthrange(one_year_from_now.year, one_year_from_now.month)
-day = res[1]
-
-end_date = datetime.datetime(one_year_from_now.year, one_year_from_now.month, day)
-end_date_formated = end_date.strftime("%d/%m/%Y")
-f["end_date"] = "Fecha de vencimiento:\t "+str(end_date_formated)
+import locale
 
 
-f["factura_id"] = "FAC-00001"
-
-f["cliente_name"] = "Cliente: Empresa S.L."
-f["cliente_address"] = "Direccion 1\nCiudad\nCódigo postal, España"
-f["cliente_CIF"] = "CIF: XXXXXXXXXXX"
-f["cliente_phone"] = "tlf: XXXXXXXXX"
-f["cliente_email"] = "email: email@correo.es"
 
 
-#and now we render the page
-f.render("./template.pdf")
+def get_last_day_of_month(year: int, month: int) -> str:
+    # Obtener el último día del mes
+    last_day = calendar.monthrange(year, month)[1]
+    # Crear un objeto datetime con el último día del mes
+    last_date = datetime(year, month, last_day)
+    # Formatear la fecha a un string
+    return last_date.strftime("%d-%m-%Y")
+
+def format_number_custom(number: float, locale_name: str = 'es_ES.UTF-8', decimal_places: int = 2) -> str:
+    # Establecer el locale
+    locale.setlocale(locale.LC_ALL, locale_name)
+    
+    # Separar la parte entera y decimal del número
+    integer_part, decimal_part = f"{number:.{decimal_places}f}".split(".")
+    
+    # Formatear la parte entera con separadores de miles
+    formatted_integer = locale.format_string("%d", int(integer_part), grouping=True)
+    
+    # Combinar la parte entera formateada con la parte decimal
+    formatted_number = f"{formatted_integer},{decimal_part}"
+    
+    return formatted_number
+
+# Establecer el locale a 'es_ES'
+locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+# Path to the logo image
+logo_path = os.path.abspath("app/assets/acanata.png")
+
+# Leer la imagen y convertirla a Base64
+with open(logo_path, "rb") as image_file:
+    encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+
+# Crear el data URI
+data_uri = f"data:image/png;base64,{encoded_string}"
+
+factura_id = "FAC-00001"
+cliente_name = "Empresa S.L."
+cliente_direccion="Direccion 1 Direccion 2 Direccion Direccion Direccion Direccion"
+cliente_ciudad = "Ciudad"
+cliente_codigo_postal = 000000
+cliente_country = "España"
+cliente_cif = "XXXXXXXXXXX"
+cliente_tel = "XXXXXXXXX"
+cliente_email = "cliente@email.com"
+
+servicios = "<tr>\n<td>1</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>15</td>\n<td>1000</td>\n<td>15000</td>\n</tr>"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+servicios = servicios +"\n<tr>\n<td>2</td>\n<td>Comercialización de servicios propios del proveedor</td>\n<td>1</td>\n<td>200</td>\n<td>200</td>\n"
+
+servicios_subtotal = 15200.252
+servicios_iva=3192
+servicios_total = 18392
+now = datetime.now()
+factura_date = now.strftime("%d-%m-%Y")
+vencimiento_date = get_last_day_of_month(now.year, now.month)
+
+# HTML content
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice</title>
+    <style>
+        @page {{
+            size: A4;
+            margin: 10mm; /* Márgenes del documento A4 */
+        }}
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #fff; /* Cambiar el fondo a blanco */
+            line-height: 150%;
+            font-size: 9pt;
+        }}
+        .container {{
+            width: 100%; /* Asegurarse de que la anchura sea del 100% */
+            margin: 0 auto; /* Centrar el contenedor */
+            background: #fff; /* Fondo blanco para el contenedor */
+            padding: 20px; /* Añadir un poco de relleno */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+        }}
+        .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }}
+        .header img {{
+            width: 100px;
+            height: auto;
+        }}
+        .header h1 {{
+            margin: 0;
+            text-align: center;
+        }}
+        .header p {{
+            margin: 0;
+            text-align: center;
+        }}
+        .footer {{
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            padding: 10px 0;
+        }}
+        .company-info, .invoice-info, .client-info, .invoice-details {{
+            margin-bottom: 20px;
+        }}
+
+        .company-info p, .client-info p {{
+            margin: 5px 0;
+            line-height: 110%;
+        }}
+        .invoice-details table {{
+            width: 95%;
+            font-size: 8pt;
+            border-collapse: collapse;
+        }}
+        .invoice-details th, .invoice-details td {{
+            padding: 7px;
+        }}
+        .invoice-details th {{
+            background: #f4f4f4;
+        }}
+        .row {{
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -15px;
+        }}
+        .col-6 {{
+            flex: 0 0 50%;
+            max-width: 50%;
+            padding: 0 15px;
+        }}
+        .col-12 {{
+            flex: 0 0 100%;
+            max-width: 100%;
+            padding: 0 15px;
+        }}
+
+         .total-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+        }}
+        .total-table th, .total-table td {{
+            padding: 7px;
+        }}
+        .total-table th {{
+            text-align: right;
+            width: 50%; /* Ajustar el ancho de la celda del encabezado */
+            font-weight: normal;
+        }}
+        .total-table td {{
+            text-align: left;
+            width: 70%; /* Ajustar el ancho de la celda de datos */
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row header">
+            <div class="col-6">
+                <img src="{data_uri}" alt="Company Logo" class="logo">
+            </div>
+            <div class="col-6">
+                <h1>Factura</h1>
+                <p><strong>{factura_id}</strong></p>
+            </div>
+        </div>
+        <div class="company-info">
+            <h3>Acanata S.L.</h3>
+            <p>Rivas Vaciamadrid</p>
+            <p>28523, España</p>
+            <p>CIF: B56285562</p>
+            <p>tlf: 608236720</p>
+            <p>email: a.martinez@acanata.es</p>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                <div class="client-info">
+                    <h3>Cliente: {cliente_name}</h3>
+                    <p> {cliente_direccion} </p>
+                    <p> {cliente_ciudad} </p>
+                    <p> {cliente_codigo_postal}, {cliente_country}</p>
+                    <p>CIF: {cliente_cif}</p>
+                    <p>tlf: {cliente_tel}</p>
+                    <p>email: {cliente_email} </p>
+                </div>
+            </div>
+            <div class="col-6">
+                   <table class="total-table">
+        <tr>
+            <td>Fecha de la factura:</td>
+            <td> {factura_date}</td>
+        </tr>
+        <tr>
+            <td>Terminos:</td>
+            <td>Vencimiento a final de mes</td>
+        </tr>
+        <tr>
+            <td>Fecha de vencimiento:</td>
+            <td>{vencimiento_date}</td>
+        </tr>
+    </table>
+ 
+            </div>
+        </div>
+        <div class="invoice-details">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Descripción</th>
+                        <th>Nº de trabajadores</th>
+                        <th>Precio (€)</th>
+                        <th>Total (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {servicios}                    
+                </tbody>
+            </table>
+        </div>
+        <div class="row">
+        <div class="col-6">
+        </div>
+        <div class="col-6">
+       <table class="total-table">
+        <tr>
+            <td>subotal:</td>
+            <td>{format_number_custom(servicios_subtotal)} €</td>
+        </tr>
+        <tr>
+            <td>IVA (21%):</td>
+            <td>{format_number_custom(servicios_iva)} €</td>
+        </tr>
+        <tr>
+            <td style="font-weight: bold;">Total:</td>
+            <td>{format_number_custom(servicios_total)} €</td>
+        </tr>
+    </table>
+        </div>
+        </div>
+
+    </div>
+    <p style="font-size: 8pt;">Pago por transferencia bancaria: ES41 0128 0027 8601 0012 2084</p>
+    <div class="footer">
+        <p>&copy; 2024 Acanata S.L.</p>
+    </div>
+</body>
+</html>
+"""
+
+# Convert HTML to PDF
+HTML(string=html_content).write_pdf("invoice.pdf")

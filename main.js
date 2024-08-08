@@ -2,10 +2,11 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const request = require('request');
+const express = require('express');
 
 let mainWindow;
 
-function createWindow () {
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -16,12 +17,12 @@ function createWindow () {
     }
   });
 
-  mainWindow.loadFile('app/renderer/index.html');
+  mainWindow.loadURL('http://localhost:3000');
 }
 
 app.on('ready', () => {
   const python = spawn('python', ['./app/main/main.py']);
-  
+
   python.stdout.on('data', (data) => {
     console.log(`stdout: ${data}`);
   });
@@ -34,7 +35,14 @@ app.on('ready', () => {
     console.log(`child process exited with code ${code}`);
   });
 
-  createWindow();
+  const expressApp = express();
+  expressApp.use('/node_modules', express.static(path.join(__dirname, 'node_modules')));
+  expressApp.use(express.static(path.join(__dirname, 'app/renderer')));
+
+  expressApp.listen(3000, () => {
+    console.log('Express server is running on http://localhost:3000');
+    createWindow();
+  });
 
   // Esperar un momento antes de enviar las solicitudes para asegurar que el servidor está listo
   setTimeout(() => {
