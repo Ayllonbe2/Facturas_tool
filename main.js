@@ -89,6 +89,30 @@ app.on('ready', () => {
       loadCustomers();
     });
 
+    ipcMain.on('load-all-customers', (event) => {
+      console.log('Sending load-all-customers request');
+      request.get('http://127.0.0.1:8000/get_customers', (error, res, body) => {
+        if (error) {
+          console.error('Error loading all customers:', error);
+          return;
+        }
+        const customers = JSON.parse(body);
+        mainWindow.webContents.send('all-customers', customers);
+      });
+    });
+
+    ipcMain.on('load-all-invoices', (event) => {
+      console.log('Sending load-all-invoices request');
+      request.get('http://127.0.0.1:8000/get_invoices', (error, res, body) => {
+        if (error) {
+          console.error('Error loading all invoices:', error);
+          return;
+        }
+        const invoices = JSON.parse(body);
+        mainWindow.webContents.send('all-invoices', invoices);
+      });
+    });
+
     function loadCustomers() {
       request.get('http://127.0.0.1:8000/get_customers', (error, res, body) => {
         if (error) {

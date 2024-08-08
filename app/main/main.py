@@ -29,6 +29,7 @@ def init_db():
                         id INTEGER PRIMARY KEY, 
                         customer_id INTEGER,
                         amount REAL,
+                        date TEXT DEFAULT (datetime('now','localtime')),
                         FOREIGN KEY(customer_id) REFERENCES customers(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS customers (
                         id INTEGER PRIMARY KEY, 
@@ -75,6 +76,19 @@ def get_customers():
     customers = c.fetchall()
     conn.close()
     return [{"id": customer[0], "name": customer[1], "email": customer[2], "phone": customer[3]} for customer in customers]
+
+@app.get('/get_invoices')
+def get_invoices():
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("""
+    SELECT invoices.id, customers.name, invoices.amount, invoices.date 
+    FROM invoices 
+    JOIN customers ON invoices.customer_id = customers.id
+    """)
+    invoices = c.fetchall()
+    conn.close()
+    return [{"id": invoice[0], "customer": invoice[1], "amount": invoice[2], "date": invoice[3]} for invoice in invoices]
 
 def get_customer_by_id(customer_id):
     conn = sqlite3.connect(db_path)

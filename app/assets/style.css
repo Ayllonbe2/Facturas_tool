@@ -1,0 +1,38 @@
+/* Estilo básico para el contenedor y las secciones */
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+}
+
+.container-fluid {
+    padding: 0;
+}
+
+.sidebar {
+    background: #343a40;
+    color: #fff;
+    min-height: 100vh;
+}
+
+.sidebar .nav-link {
+    color: #fff;
+}
+
+.sidebar .nav-link.active {
+    background: #007bff;
+    color: #fff;
+}
+
+.main {
+    padding: 20px;
+}
+
+/* Ocultar todas las secciones por defecto */
+.section {
+    display: none;
+}
+
+/* Mostrar solo la sección activa */
+.section.active {
+    display: block;
+}

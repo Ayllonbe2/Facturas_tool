@@ -3,25 +3,148 @@
 <head>
   <meta charset="UTF-8">
   <title>Generador de Facturas</title>
+  <style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.wrapper {
+    display: flex;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: #333;
+    color: white;
+    height: 100vh;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar ul li {
+    margin-bottom: 10px;
+}
+
+.sidebar ul li a {
+    color: white;
+    text-decoration: none;
+}
+
+.content {
+    flex: 1;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+form label {
+    margin-top: 10px;
+}
+
+form input, form select, form button {
+    margin-top: 5px;
+    padding: 8px;
+    font-size: 16px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+table, th, td {
+    border: 1px solid #ddd;
+}
+
+th, td {
+    padding: 10px;
+    text-align: left;
+}
+
+
+  </style>
 </head>
 <body>
-  <h1>Generador de Facturas</h1>
-  
-  <h2>Agregar Cliente</h2>
-  <form id="customer-form">
-    <input type="text" id="customer-name" placeholder="Nombre" required>
-    <input type="email" id="customer-email" placeholder="Email" required>
-    <input type="tel" id="customer-phone" placeholder="Teléfono" required>
-    <button type="submit">Agregar Cliente</button>
-  </form>
-  
-  <h2>Generar Factura</h2>
-  <form id="invoice-form">
-    <select id="customer-select"></select>
-    <input type="text" id="amount" placeholder="Monto" required>
-    <button type="submit">Generar Factura</button>
-  </form>
-  
+  <div class="wrapper">
+    <nav class="sidebar">
+      <ul>
+        <li><a href="#" onclick="showSection('add-client')">Agregar Cliente</a></li>
+        <li><a href="#" onclick="showSection('create-invoice')">Crear Factura</a></li>
+        <li><a href="#" onclick="showSection('view-clients')">Ver Todos los Clientes</a></li>
+        <li><a href="#" onclick="showSection('view-invoices')">Ver Facturas Emitidas</a></li>
+      </ul>
+    </nav>
+    <main class="content">
+      <h1>Generador de Facturas</h1>
+      <div id="add-client" class="section">
+        <h2>Agregar Cliente</h2>
+        <form id="customer-form">
+          <input type="text" id="customer-name" placeholder="Nombre" required>
+          <input type="email" id="customer-email" placeholder="Email" required>
+          <input type="tel" id="customer-phone" placeholder="Teléfono" required>
+          <button type="submit">Agregar Cliente</button>
+        </form>
+      </div>
+      <div id="create-invoice" class="section">
+        <h2>Generar Factura</h2>
+        <form id="invoice-form">
+          <select id="customer-select"></select>
+          <input type="text" id="amount" placeholder="Monto" required>
+          <button type="submit">Generar Factura</button>
+        </form>
+      </div>
+      <div id="view-clients" class="section">
+        <h2>Ver Todos los Clientes</h2>
+        <table id="clients-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Filas cargadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+      <div id="view-invoices" class="section">
+        <h2>Ver Facturas Emitidas</h2>
+        <table id="invoices-table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Monto</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Filas cargadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
   <script src="renderer.js"></script>
 </body>
 </html>
