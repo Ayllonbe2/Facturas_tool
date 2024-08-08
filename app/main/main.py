@@ -2,19 +2,29 @@ import os
 import sqlite3
 from fpdf import FPDF
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional
+import logging
 
 app = FastAPI()
 
 # Define the path to the database
 db_path = os.path.join(os.path.dirname(__file__), 'invoices.db')
 
+# Set up logging
+logger = logging.getLogger("uvicorn.error")
+
 class Customer(BaseModel):
-    id: int
-    name: str
-    email: str
-    phone: str
+    id: Optional[int] = None
+    name: str = Field(..., example="Nombre")
+    address: str = Field(..., example="Dirección")
+    city: str = Field(..., example="Ciudad")
+    postal_code: str = Field(..., example="Código Postal")
+    country: str = Field(..., example="País")
+    cif: str = Field(..., example="CIF")
+    phone: str = Field(..., example="Teléfono")
+    email: str = Field(..., example="Email")
+
 
 class Invoice(BaseModel):
     customer_id: int
@@ -22,29 +32,38 @@ class Invoice(BaseModel):
 
 def init_db():
     # Create the database file if it doesn't exist
-    if not os.path.exists(db_path):
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS invoices (
-                        id INTEGER PRIMARY KEY, 
-                        customer_id INTEGER,
-                        amount REAL,
-                        date TEXT DEFAULT (datetime('now','localtime')),
-                        FOREIGN KEY(customer_id) REFERENCES customers(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS customers (
-                        id INTEGER PRIMARY KEY, 
-                        name TEXT, 
-                        email TEXT, 
-                        phone TEXT)''')
-        conn.commit()
-        conn.close()
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # Create customers table if it doesn't exist
+    c.execute('''CREATE TABLE IF NOT EXISTS customers (
+                    id INTEGER PRIMARY KEY, 
+                    name TEXT,
+                    address TEXT,
+                    city TEXT,
+                    postal_code TEXT,
+                    country TEXT,
+                    cif TEXT,
+                    phone TEXT, 
+                    email TEXT)''')
+    
+    # Create invoices table if it doesn't exist
+    c.execute('''CREATE TABLE IF NOT EXISTS invoices (
+                    id INTEGER PRIMARY KEY, 
+                    customer_id INTEGER,
+                    amount REAL,
+                    date TEXT DEFAULT (datetime('now','localtime')),
+                    FOREIGN KEY(customer_id) REFERENCES customers(id))''')
+    
+    conn.commit()
+    conn.close()
 
 @app.post('/generate_invoice')
 def generate_invoice(invoice: Invoice):
-    print(f"Received invoice data: {invoice}")
+    logger.info(f"Received invoice data: {invoice}")
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute("INSERT INTO invoices (customer_id, amount) VALUES (?, ?)", (invoice.customer_id, invoice.amount))
+    c.execute("INSERT INTO invoices (customer_id, amount, date) VALUES (?, ?, datetime('now', 'localtime'))", (invoice.customer_id, invoice.amount))
     conn.commit()
     invoice_id = c.lastrowid
     conn.close()
@@ -58,14 +77,15 @@ def generate_invoice(invoice: Invoice):
 
 @app.post('/add_customer')
 def add_customer(customer: Customer):
-    print(f"Received customer data: {customer}")
+    logger.info(f"Received customer data: {customer}")
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute("INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)", (customer.name, customer.email, customer.phone))
+    c.execute("INSERT INTO customers (name, address, city, postal_code, country, cif, phone, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+              (customer.name, customer.address, customer.city, customer.postal_code, customer.country, customer.cif, customer.phone, customer.email))
     conn.commit()
     customer_id = c.lastrowid
     conn.close()
-    print(f"Customer added with ID: {customer_id}")
+    logger.info(f"Customer added with ID: {customer_id}")
     return {"status": "success", "customer_id": customer_id}
 
 @app.get('/get_customers', response_model=List[Customer])
@@ -75,7 +95,7 @@ def get_customers():
     c.execute("SELECT * FROM customers")
     customers = c.fetchall()
     conn.close()
-    return [{"id": customer[0], "name": customer[1], "email": customer[2], "phone": customer[3]} for customer in customers]
+    return [{"id": customer[0], "name": customer[1], "address": customer[2], "city": customer[3], "postal_code": customer[4], "country": customer[5], "cif": customer[6], "phone": customer[7], "email": customer[8]} for customer in customers]
 
 @app.get('/get_invoices')
 def get_invoices():
@@ -88,6 +108,8 @@ def get_invoices():
     """)
     invoices = c.fetchall()
     conn.close()
+    if not invoices:
+        return []
     return [{"id": invoice[0], "customer": invoice[1], "amount": invoice[2], "date": invoice[3]} for invoice in invoices]
 
 def get_customer_by_id(customer_id):
@@ -104,12 +126,17 @@ def generate_pdf(invoice_id, customer, amount):
     pdf.set_font("Arial", size = 12)
     pdf.cell(200, 10, txt = f"Factura #{invoice_id}", ln = True, align = 'C')
     pdf.cell(200, 10, txt = f"Cliente: {customer[1]}", ln = True, align = 'L')
-    pdf.cell(200, 10, txt = f"Email: {customer[2]}", ln = True, align = 'L')
-    pdf.cell(200, 10, txt = f"Teléfono: {customer[3]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"Dirección: {customer[2]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"Ciudad: {customer[3]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"Código Postal: {customer[4]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"País: {customer[5]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"CIF: {customer[6]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"Teléfono: {customer[7]}", ln = True, align = 'L')
+    pdf.cell(200, 10, txt = f"Email: {customer[8]}", ln = True, align = 'L')
     pdf.cell(200, 10, txt = f"Monto: {amount}", ln = True, align = 'L')
     pdf_file = f"invoice_{invoice_id}.pdf"
     pdf.output(pdf_file)
-    print(f"PDF generado: {pdf_file}")
+    logger.info(f"PDF generado: {pdf_file}")
 
 if __name__ == '__main__':
     init_db()

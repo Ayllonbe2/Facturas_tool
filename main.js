@@ -51,8 +51,13 @@ app.on('ready', () => {
       request.post('http://127.0.0.1:8000/add_customer', {
         json: {
           name: arg.name,
-          email: arg.email,
-          phone: arg.phone
+          address: arg.address,
+          city: arg.city,
+          postal_code: arg.postal_code,
+          country: arg.country,
+          cif: arg.cif,
+          phone: arg.phone,
+          email: arg.email
         }
       }, (error, res, body) => {
         if (error) {

@@ -1,8 +1,8 @@
 const { ipcRenderer } = require('electron');
 
-// Mostrar la sección de Agregar Cliente al cargar
+// Mostrar la sección de Inicio al cargar
 document.addEventListener('DOMContentLoaded', function() {
-    showSection('add-client');
+    showSection('home');
 });
 
 // Manejar el formulario para agregar clientes
@@ -10,12 +10,19 @@ document.getElementById('customer-form').addEventListener('submit', (event) => {
   event.preventDefault();
   
   const name = document.getElementById('customer-name').value;
-  const email = document.getElementById('customer-email').value;
+  const address = document.getElementById('customer-address').value;
+  const city = document.getElementById('customer-city').value;
+  const postal_code = document.getElementById('customer-postal-code').value;
+  const country = document.getElementById('customer-country').value;
+  const cif = document.getElementById('customer-cif').value;
   const phone = document.getElementById('customer-phone').value;
+  const email = document.getElementById('customer-email').value;
 
-  console.log('Sending customer data:', { name, email, phone });
+  const customerData = { name, address, city, postal_code, country, cif, phone, email };
   
-  ipcRenderer.send('add-customer', { name, email, phone });
+  console.log('Sending customer data:', customerData);
+  
+  ipcRenderer.send('add-customer', customerData);
 });
 
 // Manejar el formulario para generar facturas
@@ -76,8 +83,13 @@ function viewAllCustomers() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${customer.name}</td>
-                <td>${customer.email}</td>
+                <td>${customer.address}</td>
+                <td>${customer.city}</td>
+                <td>${customer.postal_code}</td>
+                <td>${customer.country}</td>
+                <td>${customer.cif}</td>
                 <td>${customer.phone}</td>
+                <td>${customer.email}</td>
             `;
             clientsTableBody.appendChild(row);
         });
@@ -89,19 +101,29 @@ function viewAllCustomers() {
 function viewAllInvoices() {
     ipcRenderer.send('load-all-invoices');
     ipcRenderer.on('all-invoices', (event, invoices) => {
-        const invoicesTableBody = document.getElementById('invoices-table').querySelector('tbody');
-        invoicesTableBody.innerHTML = ''; // Limpiar las filas actuales
+        try {
+            const invoicesTableBody = document.getElementById('invoices-table').querySelector('tbody');
+            invoicesTableBody.innerHTML = ''; // Limpiar las filas actuales
 
-        invoices.forEach(invoice => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${invoice.customer}</td>
-                <td>${invoice.amount}</td>
-                <td>${invoice.date}</td>
-            `;
-            invoicesTableBody.appendChild(row);
-        });
-        console.log('Loaded all invoices:', invoices);
+            if (invoices.length === 0) {
+                throw new Error("No invoices found");
+            }
+
+            invoices.forEach(invoice => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${invoice.customer}</td>
+                    <td>${invoice.amount}</td>
+                    <td>${invoice.date}</td>
+                `;
+                invoicesTableBody.appendChild(row);
+            });
+            console.log('Loaded all invoices:', invoices);
+        } catch (error) {
+            console.error('Error loading invoices:', error.message);
+            const invoicesTableBody = document.getElementById('invoices-table').querySelector('tbody');
+            invoicesTableBody.innerHTML = '<tr><td colspan="3">No invoices found</td></tr>';
+        }
     });
 }
 
