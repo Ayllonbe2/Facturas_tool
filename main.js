@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const request = require('request');
@@ -19,6 +19,9 @@ function createWindow() {
 
   mainWindow.loadURL('http://localhost:3000');
 }
+
+
+
 
 app.on('ready', () => {
   const python = spawn('python', ['./app/main/main.py']);
@@ -77,7 +80,7 @@ app.on('ready', () => {
       request.post('http://127.0.0.1:8000/generate_invoice', {
         json: {
           customer_id: arg.customer_id,
-          amount: arg.amount
+          services: arg.services  // Enviar la lista de servicios
         }
       }, (error, res, body) => {
         if (error) {
@@ -88,6 +91,7 @@ app.on('ready', () => {
         console.log('Response:', body);
       });
     });
+    
 
     ipcMain.on('load-customers', (event) => {
       console.log('Sending load-customers request');
@@ -149,6 +153,58 @@ ipcMain.on('update-customer', (event, customer) => {
     mainWindow.webContents.send('customer-updated');
   });
 });
+
+// Obtener datos de una factura para editar
+ipcMain.on('get-invoice', (event, invoiceId) => {
+  request.get(`http://127.0.0.1:8000/get_invoice/${invoiceId}`, (error, res, body) => {
+    if (error) {
+      console.error('Error fetching invoice:', error);
+      return;
+    }
+    const invoice = JSON.parse(body);
+    mainWindow.webContents.send('invoice-data', invoice);
+  });
+});
+
+// Actualizar factura
+ipcMain.on('update-invoice', (event, invoice) => {
+  console.log('Invoice data being sent for update:', invoice);  // Debugging line
+  request.put(`http://127.0.0.1:8000/update_invoice/${invoice.id}`, {
+    json: invoice
+  }, (error, res, body) => {
+    if (error) {
+      console.error('Error updating invoice:', error);
+      return;
+    }
+    mainWindow.webContents.send('invoice-updated');
+  });
+});
+
+
+ipcMain.on('regenerate-invoice', (event, invoiceId) => {
+  console.log('Sending regenerate-invoice request:', invoiceId);
+  request.post(`http://127.0.0.1:8000/regenerate_invoice/${invoiceId}`, (error, res, body) => {
+      if (error) {
+          console.error('Error regenerating invoice:', error);
+          return;
+      }
+      console.log(`Regenerate invoice statusCode: ${res.statusCode}`);
+      console.log('Response:', body);
+      
+      if (res.statusCode === 200) {
+          dialog.showMessageBoxSync({
+              type: 'info',
+              title: 'Factura Regenerada',
+              message: `La factura con ID: ${invoiceId} ha sido regenerada con éxito.`,
+              buttons: ['OK']
+          });
+      } else {
+          dialog.showErrorBox('Error', 'No se pudo regenerar la factura.');
+      }
+  });
+});
+
+
 
     function loadCustomers() {
       request.get('http://127.0.0.1:8000/get_customers', (error, res, body) => {
