@@ -76,22 +76,73 @@ app.on('ready', () => {
     });
 
     ipcMain.on('generate-invoice', (event, arg) => {
-      console.log('Sending generate-invoice request:', arg);
+      // Primera llamada: Crear la factura en la base de datos
       request.post('http://127.0.0.1:8000/generate_invoice', {
-        json: {
-          customer_id: arg.customer_id,
-          services: arg.services  // Enviar la lista de servicios
-        }
+          json: {
+              customer_id: arg.customer_id,
+              services: arg.services
+          }
       }, (error, res, body) => {
-        if (error) {
-          console.error('Error generating invoice:', error);
-          return;
+          if (error) {
+              console.error('Error generating invoice:', error);
+              return;
+          }
+  
+          // Aquí verificamos si la respuesta es JSON y la parseamos si es necesario
+          let invoiceId;
+          try {
+              const response = typeof body === 'string' ? JSON.parse(body) : body;
+              invoiceId = response.invoice_id;
+              console.log(`Invoice created with ID: ${invoiceId}`);
+          } catch (e) {
+              console.error('Error parsing JSON response:', e);
+              return;
+          }
+          
+          // Segunda llamada: Solicitar la ubicación para guardar el PDF
+          const savePath = dialog.showSaveDialogSync(mainWindow, {
+              title: 'Guardar Factura',
+              defaultPath: path.join(app.getPath('documents'), `Factura-${invoiceId}.pdf`),
+              filters: [
+                  { name: 'PDF Files', extensions: ['pdf'] }
+              ]
+          });
+  
+          if (savePath) {
+            console.log('Saving regenerated invoice to:', savePath);
+            request.post(`http://127.0.0.1:8000/regenerate_invoice/${invoiceId}`, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    save_path: savePath  // Pasar la ruta de guardado al backend
+                })
+            }, (error, res, body) => {
+                if (error) {
+                    console.error('Error regenerating invoice:', error);
+                    return;
+                }
+                console.log(`Regenerate invoice statusCode: ${res.statusCode}`);
+                console.log('Response:', body);
+      
+                if (res.statusCode === 200) {
+                    dialog.showMessageBoxSync({
+                        type: 'info',
+                        title: 'Factura Regenerada',
+                        message: `La factura con ID: ${invoiceId} ha sido regenerada con éxito.`,
+                        buttons: ['OK']
+                    });
+                } else {
+                    dialog.showErrorBox('Error', 'No se pudo regenerar la factura.');
+                }
+            });
+        } else {
+            console.log('Save operation was canceled.');
         }
-        console.log(`Generate invoice statusCode: ${res.statusCode}`);
-        console.log('Response:', body);
       });
-    });
-    
+  });
+  
+  
 
     ipcMain.on('load-customers', (event) => {
       console.log('Sending load-customers request');
@@ -182,28 +233,47 @@ ipcMain.on('update-invoice', (event, invoice) => {
 
 
 ipcMain.on('regenerate-invoice', (event, invoiceId) => {
-  console.log('Sending regenerate-invoice request:', invoiceId);
-  request.post(`http://127.0.0.1:8000/regenerate_invoice/${invoiceId}`, (error, res, body) => {
-      if (error) {
-          console.error('Error regenerating invoice:', error);
-          return;
-      }
-      console.log(`Regenerate invoice statusCode: ${res.statusCode}`);
-      console.log('Response:', body);
-      
-      if (res.statusCode === 200) {
-          dialog.showMessageBoxSync({
-              type: 'info',
-              title: 'Factura Regenerada',
-              message: `La factura con ID: ${invoiceId} ha sido regenerada con éxito.`,
-              buttons: ['OK']
-          });
-      } else {
-          dialog.showErrorBox('Error', 'No se pudo regenerar la factura.');
-      }
+  // Abrir cuadro de diálogo para seleccionar la ubicación de guardado
+  const savePath = dialog.showSaveDialogSync(mainWindow, {
+      title: 'Guardar Factura',
+      defaultPath: path.join(app.getPath('documents'), `Factura-${invoiceId}.pdf`),
+      filters: [
+          { name: 'PDF Files', extensions: ['pdf'] }
+      ]
   });
-});
 
+  if (savePath) {
+      console.log('Saving regenerated invoice to:', savePath);
+      request.post(`http://127.0.0.1:8000/regenerate_invoice/${invoiceId}`, {
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+              save_path: savePath  // Pasar la ruta de guardado al backend
+          })
+      }, (error, res, body) => {
+          if (error) {
+              console.error('Error regenerating invoice:', error);
+              return;
+          }
+          console.log(`Regenerate invoice statusCode: ${res.statusCode}`);
+          console.log('Response:', body);
+
+          if (res.statusCode === 200) {
+              dialog.showMessageBoxSync({
+                  type: 'info',
+                  title: 'Factura Regenerada',
+                  message: `La factura con ID: ${invoiceId} ha sido regenerada con éxito.`,
+                  buttons: ['OK']
+              });
+          } else {
+              dialog.showErrorBox('Error', 'No se pudo regenerar la factura.');
+          }
+      });
+  } else {
+      console.log('Save operation was canceled.');
+  }
+});
 
 
     function loadCustomers() {

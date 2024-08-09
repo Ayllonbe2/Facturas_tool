@@ -17,6 +17,9 @@ db_path = os.path.join(os.path.dirname(__file__), 'invoices.db')
 # Set up logging
 logger = logging.getLogger("uvicorn.error")
 
+class RegenerateInvoiceRequest(BaseModel):
+    save_path: str
+
 class Customer(BaseModel):
     id: Optional[int] = None
     name: str = Field(..., example="Nombre")
@@ -82,9 +85,8 @@ def init_db():
     conn.close()
 
 
-
 @app.post('/generate_invoice')
-def generate_invoice(invoice: Invoice, request: Request):
+def generate_invoice(invoice: Invoice):
     logger.info(f"Received invoice data: {invoice}")
     
     # Procesar los datos del cliente y generar la factura
@@ -103,14 +105,6 @@ def generate_invoice(invoice: Invoice, request: Request):
     
     conn.commit()
     conn.close()
-    
-    # Obtener los detalles del cliente para el PDF
-    customer = get_customer_by_id(invoice.customer_id)
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-
-    # Llamar a la función para generar el PDF
-    generate_pdf(invoice_id, customer, invoice.services, sum(service.total for service in invoice.services))
     
     return {"status": "success", "invoice_id": invoice_id}
 
@@ -142,9 +136,22 @@ def update_invoice(invoice_id: int, invoice: Invoice):
     conn.close()
     return {"status": "success", "invoice_id": invoice_id}
 
+@app.get('/get_last_invoice_id')
+def get_last_invoice_id():
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("SELECT MAX(id) FROM invoices")
+    last_invoice_id = c.fetchone()[0]
+    conn.close()
+    
+    if last_invoice_id is None:
+        last_invoice_id = 0  # Si no hay facturas, comienza desde 0
+    
+    return {"last_invoice_id": last_invoice_id}
 
 @app.post('/regenerate_invoice/{invoice_id}')
-def regenerate_invoice(invoice_id: int):
+def regenerate_invoice(invoice_id: int, request: RegenerateInvoiceRequest):
+    save_path = request.save_path
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
@@ -178,7 +185,7 @@ def regenerate_invoice(invoice_id: int):
     ]
 
     # Generar el PDF de la factura
-    generate_pdf(invoice_id, customer, service_list, invoice[2])
+    generate_pdf(invoice_id, customer, service_list, invoice[2], save_path)
 
     return {"status": "success"}
 
@@ -192,7 +199,7 @@ def get_customer_by_id(customer_id):
     conn.close()
     return customer
 
-def generate_pdf(invoice_id, customer, services, total_amount):
+def generate_pdf(invoice_id, customer, services, total_amount, save_path):
     formatted_invoice_id = str(invoice_id).zfill(10)
     # Load company logo or any other static information
     logo_path = os.path.abspath("app/assets/acanata.png")
@@ -415,11 +422,11 @@ def generate_pdf(invoice_id, customer, services, total_amount):
     """
 
     # Convert HTML to PDF and save it to the specified path
-    invoicePDF = "invoice_"+str(invoice_id)+".pdf"
-    HTML(string=html_content).write_pdf(invoicePDF)
-    logger.info(f"PDF generado y guardado en: {invoicePDF}")
+     # Convert HTML to PDF and save it to the specified path
+    HTML(string=html_content).write_pdf(save_path)
+    logger.info(f"PDF generado y guardado en: {save_path}")
 
-    return {"status": "success", "file_path": invoicePDF}
+    return {"status": "success", "file_path": save_path}
 
 @app.post('/add_customer')
 def add_customer(customer: Customer):
