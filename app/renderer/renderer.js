@@ -1,4 +1,5 @@
-const { ipcRenderer } = require('electron');
+// Acceder a ipcRenderer desde el contexto seguro
+const { ipcRenderer } = window.electron;
 
 // Mostrar la sección de Inicio al cargar
 document.addEventListener('DOMContentLoaded', function() {
@@ -19,6 +20,10 @@ document.getElementById('customer-form').addEventListener('submit', (event) => {
     const email = document.getElementById('customer-email').value;
 
     const customerData = { name, address, city, postal_code, country, cif, phone, email };
+    if (!/^[ABCDEFGHJKLMNPQRSUVW][0-9]{7}[0-9A-J]$/.test(cif)) {
+        alert("Por favor, ingresa un CIF válido.");
+        return; // No continuar con la ejecución si el CIF no es válido
+    }
   
     ipcRenderer.send('add-customer', customerData);
 });
@@ -30,47 +35,45 @@ document.getElementById('customer-select').addEventListener('change', (event) =>
 });
 
 // Manejar los datos del cliente recibidos y mostrar en el formulario
-ipcRenderer.on('customer-data', (event, customer) => {
+ipcRenderer.receive('customer-data', (customer) => {
     console.log("Recibido cliente:", customer);
 });
 
-// Manejar el formulario para generar facturas
 document.getElementById('invoice-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-
-  const customer_id = parseInt(document.getElementById('customer-select').value, 10);
-
-  // Recoger los servicios añadidos
-  const services = [];
-  document.querySelectorAll('.service-row').forEach(row => {
-    const description = row.querySelector('.service-description').value;
-    const workers = parseInt(row.querySelector('.service-workers').value, 10);
-    const price = parseFloat(row.querySelector('.service-price').value);
-    const total = workers * price;
-
-    services.push({ description, workers, price, total });
-  });
-
-  // Enviar la factura con los servicios al backend
-  ipcRenderer.send('generate-invoice', { customer_id, services });
+    event.preventDefault();
+  
+    const customer_id = parseInt(document.getElementById('customer-select').value, 10);
+    const date = document.getElementById('invoice-date').value; // Capturar la fecha
+  
+    // Recoger los servicios añadidos
+    const services = [];
+    document.querySelectorAll('.service-row').forEach(row => {
+        const description = row.querySelector('.service-description').value;
+        const quantity = parseInt(row.querySelector('.service-quantity').value, 10);
+        const price = parseFloat(row.querySelector('.service-price').value);
+        const total = quantity * price;
+  
+        services.push({ description, quantity, price, total });
+    });
+  
+    // Enviar la factura con los servicios y la fecha al backend
+    ipcRenderer.send('generate-invoice', { customer_id, date, services });
 });
+  
 
 // Recibir la lista de clientes y actualizar el select
-ipcRenderer.on('customers', (event, customers) => {
-  const customerSelect = document.getElementById('customer-select');
+ipcRenderer.receive('customers', (customers) => {
+    const customerSelect = document.getElementById('customer-select');
 
-  // Añadir la opción predeterminada "Elige el cliente"
-  customerSelect.innerHTML = '<option value="">Elige el cliente</option>';
+    // Añadir la opción predeterminada "Elige el cliente"
+    customerSelect.innerHTML = '<option value="">Elige el cliente</option>';
   
-  customers.forEach(customer => {
-    console.log(customer);
-    const option = document.createElement('option');
-    option.value = customer.id;
-    option.textContent = customer.name;
-    customerSelect.appendChild(option);
-  });
-
-  console.log('Loaded customers:', customers);
+    customers.forEach(customer => {
+        const option = document.createElement('option');
+        option.value = customer.id;
+        option.textContent = customer.name;
+        customerSelect.appendChild(option);
+    });
 });
 
 // Agregar nueva fila de servicio
@@ -82,8 +85,8 @@ document.getElementById('add-service-btn').addEventListener('click', () => {
   
     serviceRow.innerHTML = `
         <input type="text" class="service-description" placeholder="Descripción del servicio" required>
-        <input type="number" class="service-workers" placeholder="Nº de trabajadores" required>
-        <input type="number" class="service-price" placeholder="Precio por trabajador (€)" required>
+        <input type="number" class="service-quantity" value=1 placeholder="Cantidad" required disabled>
+        <input type="number" class="service-price" placeholder="Precio (€)" step="0.01" required>
         <button type="button" class="remove-service-btn">Eliminar</button>
     `;
   
@@ -91,19 +94,19 @@ document.getElementById('add-service-btn').addEventListener('click', () => {
 });
 
 document.getElementById('edit-add-service-btn').addEventListener('click', () => {
-  const servicesContainer = document.getElementById('edit-services-container');
+    const servicesContainer = document.getElementById('edit-services-container');
 
-  const serviceRow = document.createElement('div');
-  serviceRow.className = 'edit-service-row';
+    const serviceRow = document.createElement('div');
+    serviceRow.className = 'edit-service-row';
 
-  serviceRow.innerHTML = `
-      <input type="text" class="service-description" placeholder="Descripción del servicio" required>
-      <input type="number" class="service-workers" placeholder="Nº de trabajadores" required>
-      <input type="number" class="service-price" placeholder="Precio por trabajador (€)" required>
-      <button type="button" class="edit-remove-service-btn">Eliminar</button>
-  `;
+    serviceRow.innerHTML = `
+        <input type="text" class="service-description" placeholder="Descripción del servicio" required>
+        <input type="number" class="service-quantity" value=1 placeholder="Cantidad" required disabled>
+        <input type="number" class="service-price" placeholder="Precio (€)" step="0.01" required>
+        <button type="button" class="edit-remove-service-btn">Eliminar</button>
+    `;
 
-  servicesContainer.appendChild(serviceRow);
+    servicesContainer.appendChild(serviceRow);
 });
 
 // Eliminar una fila de servicio
@@ -138,7 +141,7 @@ function loadCustomers() {
 // Función para editar un cliente
 function editCustomer(customerId) {
     ipcRenderer.send('get-customer', customerId);
-    ipcRenderer.once('customer-data', (event, customer) => {
+    ipcRenderer.once('customer-data', (customer) => {
         document.getElementById('edit-customer-id').value = customer.id;
         document.getElementById('edit-customer-name').value = customer.name;
         document.getElementById('edit-customer-address').value = customer.address;
@@ -155,7 +158,7 @@ function editCustomer(customerId) {
 // Lógica para ver todos los clientes
 function viewAllCustomers() {
     ipcRenderer.send('load-all-customers');
-    ipcRenderer.once('all-customers', (event, customers) => {
+    ipcRenderer.once('all-customers', (customers) => {
         const clientsTableBody = document.getElementById('clients-table').querySelector('tbody');
         clientsTableBody.innerHTML = ''; // Limpiar las filas actuales
 
@@ -184,18 +187,28 @@ function regenerateInvoice(invoiceId) {
     }
 }
 
-// Función para editar una factura
 function editInvoice(invoiceId) {
     ipcRenderer.send('get-invoice', invoiceId);
-    ipcRenderer.once('invoice-data', (event, invoice) => {
+    ipcRenderer.once('invoice-data', (invoice) => {
         document.getElementById('edit-invoice-id').value = invoice.id;
         document.getElementById('edit-invoice-customer-id').value = invoice.customer_id;
 
         ipcRenderer.send('get-customer', invoice.customer_id);
 
-        ipcRenderer.once('customer-data', (event, customer) => {
+        ipcRenderer.once('customer-data', (customer) => {
             document.getElementById('edit-invoice-customer').value = customer.name;
         });
+       
+        // Asignar la fecha al campo de fecha
+        if (invoice.date) {
+            const date = new Date(invoice.date);
+            const formattedDate = [
+                date.getFullYear(),
+                ('0' + (date.getMonth() + 1)).slice(-2),
+                ('0' + date.getDate()).slice(-2)
+            ].join('-');  // Formatear manualmente a YYYY-MM-DD
+            document.getElementById('edit-invoice-date').value = formattedDate;
+        }
 
         const servicesContainer = document.getElementById('edit-services-container');
         servicesContainer.innerHTML = ''; // Limpiar los servicios actuales
@@ -210,8 +223,8 @@ function editInvoice(invoiceId) {
 
             serviceRow.innerHTML = `
                 <input type="text" class="service-description" value="${service.description}" required>
-                <input type="number" class="service-workers" value="${service.workers}" required>
-                <input type="number" class="service-price" value="${service.price}" required>
+                <input type="number" class="service-quantity" value="${service.quantity}" required disabled>
+                <input type="number" class="service-price" value="${service.price}" step="0.01" required>
                 <input type="number" class="service-total" value="${service.total}" readonly>
                 <button type="button" class="edit-remove-service-btn">Eliminar</button>
             `;
@@ -225,10 +238,34 @@ function editInvoice(invoiceId) {
     });
 }
 
+function toggleInvoicePaid(invoiceId) {
+    fetch(`http://127.0.0.1:8520/update_invoice_payment/${invoiceId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Encuentra el checkbox correspondiente en el DOM y actualiza su estado
+            const checkbox = document.querySelector(`#invoice-checkbox-${invoiceId}`);
+            if (checkbox) {
+                checkbox.checked = data.new_paid_status; // Actualiza el estado del checkbox
+            } else {
+                console.error('Checkbox no encontrado en el DOM');
+            }
+        } else {
+            console.error('Error en la respuesta del servidor:', data);
+        }
+    })
+    .catch(error => console.error('Error updating invoice payment:', error));
+}
+
 // Lógica para ver todas las facturas
 function viewAllInvoices() {
     ipcRenderer.send('load-all-invoices');
-    ipcRenderer.once('all-invoices', (event, invoices) => {
+    ipcRenderer.once('all-invoices', (invoices) => {
         try {
             const invoicesTableBody = document.getElementById('invoices-table').querySelector('tbody');
             invoicesTableBody.innerHTML = ''; // Limpiar las filas actuales
@@ -237,27 +274,54 @@ function viewAllInvoices() {
                 throw new Error("No invoices found");
             }
 
-            invoices.forEach(invoice => {
-                // Eliminar "FAC-" para obtener un ID numérico
-                const idNumerico = parseInt(invoice.id.replace("FAC-", ""), 10);
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${invoice.id}</td>
-                    <td>${invoice.customer}</td>
-                    <td>${invoice.value}</td>
-                    <td>${invoice.date}</td>
-                    <td>
-                        <button id="editInvoice" onclick="editInvoice(${idNumerico})">Editar</button>
-                        <button onclick="regenerateInvoice(${idNumerico})">Regenerar</button>
-                    </td>
-                `;
-                invoicesTableBody.appendChild(row);
-            });
+            // Cargar los datos a la tabla usando Bootstrap Table
+            $('#invoices-table').bootstrapTable('load', invoices.map(invoice => ({
+                pagado: `<input type="checkbox" id="invoice-checkbox-${invoice.id.replace("FAC-", "")}" onclick="toggleInvoicePaid(${invoice.id.replace("FAC-", "")}, this.checked)" ${invoice.paid ? 'checked disabled' : ''}>`,
+                id: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.id}</span>`,
+                customer: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.customer}</span>`,
+                value: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.value}</span>`,
+                date: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.date}</span>`,
+                acciones: `
+                    <button id="editInvoice" onclick="editInvoice(${invoice.id.replace("FAC-", "")})" ${invoice.paid ? 'disabled' : ''}>Editar</button>
+                    <button onclick="regenerateInvoice(${invoice.id.replace("FAC-", "")})">Regenerar</button>
+                `
+            })));
         } catch (error) {
             console.error('Error loading invoices:', error.message);
             const invoicesTableBody = document.getElementById('invoices-table').querySelector('tbody');
             invoicesTableBody.innerHTML = '<tr><td colspan="5">No invoices found</td></tr>';
         }
+    });
+}
+
+document.getElementById('filter-paid-status').addEventListener('change', function() {
+    const filterValue = this.value;
+    filterTableByPaidStatus(filterValue);
+});
+
+function filterTableByPaidStatus(filterValue) {
+    ipcRenderer.send('load-all-invoices');
+    ipcRenderer.once('all-invoices', (invoices) => {
+        let filteredInvoices = invoices;
+        if (filterValue === 'paid') {
+            filteredInvoices = invoices.filter(invoice => invoice.paid === 1);
+        } else if (filterValue === 'unpaid') {
+            filteredInvoices = invoices.filter(invoice => invoice.paid === 0);
+        }
+
+        const formattedInvoices = filteredInvoices.map(invoice => ({
+            pagado: `<input type="checkbox" id="invoice-checkbox-${invoice.id.replace("FAC-", "")}" onclick="toggleInvoicePaid(${invoice.id.replace("FAC-", "")}, this.checked)" ${invoice.paid ? 'checked disabled' : ''}>`,
+            id: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.id}</span>`,
+            customer: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.customer}</span>`,
+            value: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.value}</span>`,
+            date: `<span style="opacity:${invoice.paid ? '0.5' : '1'};">${invoice.date}</span>`,
+            acciones: `
+                <button id="editInvoice" onclick="editInvoice(${invoice.id.replace("FAC-", "")})" ${invoice.paid ? 'disabled' : ''}>Editar</button>
+                <button onclick="regenerateInvoice(${invoice.id.replace("FAC-", "")})">Regenerar</button>
+            `
+        }));
+
+        $('#invoices-table').bootstrapTable('load', formattedInvoices);
     });
 }
 
@@ -279,38 +343,31 @@ function updateTotalAmount() {
     document.getElementById('edit-invoice-amount').value = totalAmount.toFixed(2);
 }
 
-// Manejar la actualización de la factura
 document.getElementById('edit-invoice-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-
-  const id = parseInt(document.getElementById('edit-invoice-id').value.replace('FAC-', ''), 10);
-  const customer_id = parseInt(document.getElementById('edit-invoice-customer-id').value, 10);
-
-  const services = [];
-  let amount = 0;
-  document.querySelectorAll('.edit-service-row').forEach(row => {
-      const description = row.querySelector('.service-description').value;
-      const workers = parseInt(row.querySelector('.service-workers').value, 10);
-      const price = parseFloat(row.querySelector('.service-price').value);
-      const total = workers * price;
-      amount = amount + total;
-      services.push({ description, workers, price, total });
-  });
-  console.log(services)
-  const updatedInvoice = { id, customer_id, amount, services };
-
-  ipcRenderer.send('update-invoice', updatedInvoice);
-
-  ipcRenderer.on('invoice-updated', () => {
-      showSection('view-invoices'); // Navegar de vuelta a la vista de facturas
-  });
-});
-
-// Manejar la respuesta después de actualizar la factura
-ipcRenderer.on('invoice-updated', () => {
-    alert('Factura actualizada con éxito');
-    viewAllInvoices(); // Recargar la vista de facturas después de la actualización
-    showSection('view-invoices'); // Volver a la sección de vista de facturas
+    event.preventDefault();
+  
+    const id = parseInt(document.getElementById('edit-invoice-id').value.replace('FAC-', ''), 10);
+    const customer_id = parseInt(document.getElementById('edit-invoice-customer-id').value, 10);
+    const date = new Date(document.getElementById('edit-invoice-date').value); // Capturar la fecha
+  
+    const services = [];
+    let amount = 0;
+    document.querySelectorAll('.edit-service-row').forEach(row => {
+        const description = row.querySelector('.service-description').value;
+        const quantity = parseInt(row.querySelector('.service-quantity').value, 10);
+        const price = parseFloat(row.querySelector('.service-price').value);
+        const total = quantity * price;
+        amount = amount + total;
+        services.push({ description, quantity, price, total });
+    });
+  
+    const updatedInvoice = { id, customer_id, date, amount, services };
+  
+    ipcRenderer.send('update-invoice', updatedInvoice);
+  
+    ipcRenderer.once('invoice-updated', () => {
+        showSection('view-invoices'); // Navegar de vuelta a la vista de facturas
+    });
 });
 
 // Manejar el formulario para editar clientes
@@ -331,7 +388,7 @@ document.getElementById('edit-customer-form').addEventListener('submit', (event)
   
     ipcRenderer.send('update-customer', updatedCustomer);
   
-    ipcRenderer.on('customer-updated', () => {
+    ipcRenderer.once('customer-updated', () => {
         showSection('view-clients');
     });
 });

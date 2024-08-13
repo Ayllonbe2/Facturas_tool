@@ -1,19 +1,49 @@
 import os
 import sqlite3
-from fpdf import FPDF
 from weasyprint import HTML
-from fastapi import FastAPI, HTTPException, Request  
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware  
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 import logging
+import calendar
 from datetime import datetime
 import base64
+import shutil
+import logging
+
+# Configurar logging en Python
+logging.basicConfig(filename='app.log', level=logging.DEBUG, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Ejemplo de cómo registrar logs
+logging.info('Servidor iniciado')
+logging.error('Este es un mensaje de error')
+
+# Guardar el log en una ubicación específica (puedes usar __file__ para rutas relativas)
+log_path = os.path.join(os.path.dirname(__file__), 'logs', 'app.log')
+logging.basicConfig(filename=log_path, level=logging.DEBUG)
 
 app = FastAPI()
 
-# Define the path to the database
-db_path = os.path.join(os.path.dirname(__file__), 'invoices.db')
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Permitir solo este origen
+    allow_credentials=True,
+    allow_methods=["*"],  # Permitir todos los métodos (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Permitir todos los encabezados
+)
 
+
+# Ruta de la base de datos en la instalación
+source_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'invoices.db')
+
+# Ruta de la base de datos en el directorio de datos de la aplicación
+db_path = os.path.join(os.getenv('APPDATA'), 'AcanataCRM', 'main', 'invoices.db')
+
+# Asegurarse de que el directorio de destino exista
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
 # Set up logging
 logger = logging.getLogger("uvicorn.error")
 
@@ -36,7 +66,7 @@ class Service(BaseModel):
     id: Optional[int] = None  # Este es opcional porque se genera automáticamente en la base de datos
     invoice_id: Optional[int] = None  # Este es opcional porque se establece cuando se crea una factura
     description: str
-    workers: int
+    quantity: int
     price: float
     total: float
 
@@ -45,12 +75,22 @@ class Invoice(BaseModel):
     customer_id: int
     services: List[Service]  # Esta lista contendrá los servicios asociados a la factura
     amount: Optional[float] = None  # Esto se calculará automáticamente en el backend
+    paid: Optional[bool] = Field(default=False)  # Campo para saber si está pagado
+    date: Optional[datetime] = None  # Campo para la fecha de la factura como datetime
 
+    @validator('paid', pre=True)
+    def parse_paid(cls, v):
+        if isinstance(v, str):
+            if v.lower() in {'true', '1', 'yes'}:
+                return True
+            elif v.lower() in {'false', '0', 'no'}:
+                return False
+        return bool(v)
 
 def init_db():
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    
+
     # Crear tabla de clientes
     c.execute('''CREATE TABLE IF NOT EXISTS customers (
                     id INTEGER PRIMARY KEY, 
@@ -68,6 +108,7 @@ def init_db():
                     id INTEGER PRIMARY KEY, 
                     customer_id INTEGER,
                     amount REAL,
+                    paid BOOLEAN DEFAULT 0,
                     date TEXT DEFAULT (datetime('now','localtime')),
                     FOREIGN KEY(customer_id) REFERENCES customers(id))''')
     
@@ -76,7 +117,7 @@ def init_db():
                     id INTEGER PRIMARY KEY,
                     invoice_id INTEGER,
                     description TEXT,
-                    workers INTEGER,
+                    quantity INTEGER,
                     price REAL,
                     total REAL,
                     FOREIGN KEY(invoice_id) REFERENCES invoices(id))''')
@@ -84,28 +125,29 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 @app.post('/generate_invoice')
 def generate_invoice(invoice: Invoice):
     logger.info(f"Received invoice data: {invoice}")
-    
+    # Usar la fecha proporcionada o la fecha de hoy si no se proporciona
+    date = invoice.date if invoice.date else datetime.now()
+
     # Procesar los datos del cliente y generar la factura
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    
-    # Insertar factura
-    c.execute("INSERT INTO invoices (customer_id, amount, date) VALUES (?, ?, datetime('now', 'localtime'))", 
-              (invoice.customer_id, sum(service.total for service in invoice.services)))
+
+    # Insertar factura con la fecha convertida a cadena
+    c.execute("INSERT INTO invoices (customer_id, amount, paid, date) VALUES (?, ?, ?, ?)", 
+              (invoice.customer_id, sum(service.total for service in invoice.services), invoice.paid, date.strftime("%Y-%m-%d")))
     invoice_id = c.lastrowid
-    
+
     # Insertar servicios asociados a la factura
     for service in invoice.services:
-        c.execute("INSERT INTO invoice_services (invoice_id, description, workers, price, total) VALUES (?, ?, ?, ?, ?)", 
-                  (invoice_id, service.description, service.workers, service.price, service.total))
-    
+        c.execute("INSERT INTO invoice_services (invoice_id, description, quantity, price, total) VALUES (?, ?, ?, ?, ?)", 
+                  (invoice_id, service.description, service.quantity, service.price, service.total))
+
     conn.commit()
     conn.close()
-    
+
     return {"status": "success", "invoice_id": invoice_id}
 
 @app.put('/update_invoice/{invoice_id}')
@@ -113,24 +155,26 @@ def update_invoice(invoice_id: int, invoice: Invoice):
     logger.info(f"Updating invoice data: {invoice}")
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    print(invoice.customer_id, invoice.amount, invoice_id)
+    
+    # Asegúrate de que la fecha está en el formato adecuado para la base de datos
+    date_str = invoice.date.strftime("%Y-%m-%d") if invoice.date else datetime.now().strftime("%Y-%m-%d")
+    
     # Primero, actualizar la tabla de facturas
     c.execute("""
         UPDATE invoices 
-        SET customer_id = ?, amount = ? 
+        SET customer_id = ?, amount = ?, paid = ?, date = ? 
         WHERE id = ?
-    """, (invoice.customer_id, invoice.amount, invoice_id))
+    """, (invoice.customer_id, invoice.amount, invoice.paid, date_str, invoice_id))
     
     # Luego, eliminar los servicios existentes asociados a la factura
     c.execute("DELETE FROM invoice_services WHERE invoice_id = ?", (invoice_id,))
     
     # Insertar los nuevos servicios
     for service in invoice.services:
-        print((invoice_id, service.description, service.workers, service.price, service.total))
         c.execute("""
-            INSERT INTO invoice_services (invoice_id, description, workers, price, total) 
+            INSERT INTO invoice_services (invoice_id, description, quantity, price, total) 
             VALUES (?, ?, ?, ?, ?)
-        """, (invoice_id, service.description, service.workers, service.price, service.total))
+        """, (invoice_id, service.description, service.quantity, service.price, service.total))
     
     conn.commit()
     conn.close()
@@ -177,19 +221,26 @@ def regenerate_invoice(invoice_id: int, request: RegenerateInvoiceRequest):
             id=service[0],
             invoice_id=service[1],
             description=service[2],
-            workers=service[3],
+            quantity=service[3],
             price=service[4],
             total=service[5]
         )
         for service in services_data
     ]
+    print(invoice[3])
+
+    date_invoice = datetime.strptime(invoice[3], '%Y-%m-%d').date()
 
     # Generar el PDF de la factura
-    generate_pdf(invoice_id, customer, service_list, invoice[2], save_path)
+    generate_pdf(invoice_id, date_invoice, customer, service_list, invoice[2], save_path)
 
     return {"status": "success"}
 
-
+def end_of_month(date: datetime) -> datetime:
+    # Obtener el último día del mes
+    last_day = calendar.monthrange(date.year, date.month)[1]
+    # Retornar la fecha con el último día del mes
+    return datetime(date.year, date.month, last_day).strftime("%d-%m-%Y")
 
 def get_customer_by_id(customer_id):
     conn = sqlite3.connect(db_path)
@@ -199,11 +250,16 @@ def get_customer_by_id(customer_id):
     conn.close()
     return customer
 
-def generate_pdf(invoice_id, customer, services, total_amount, save_path):
+def generate_pdf(invoice_id, date, customer, services, total_amount, save_path):
     formatted_invoice_id = str(invoice_id).zfill(10)
-    # Load company logo or any other static information
-    logo_path = os.path.abspath("app/assets/acanata.png")
-    print(logo_path)
+    # Obtener la ruta al directorio donde se encuentra el script actual (app/main/)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Construir la ruta absoluta al archivo logo (subir un nivel y luego entrar en assets/)
+    logo_path = os.path.join(current_dir, '..', 'assets', 'acanata.png')
+
+    # Normalizar la ruta para asegurarte de que funcione en todos los sistemas operativos
+    logo_path = os.path.normpath(logo_path)
     # Insert logo as base64 string in the PDF
     with open(logo_path, "rb") as image_file:
         encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
@@ -217,15 +273,14 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
         <tr>
             <td>{i}</td>
             <td>{service.description}</td>
-            <td>{service.workers}</td>
-            <td>{service.price}</td>
+           <!-- <td>{service.quantity}</td> -->
+          <!--  <td>{service.price}</td> -->
             <td>{service.total}</td>
         </tr>
         """
 
     # Formatear la fecha actual
-    now = datetime.now()
-    factura_date = now.strftime("%d-%m-%Y")
+    factura_date = date.strftime("%d-%m-%Y")
 
     html_content = f"""
     <!DOCTYPE html>
@@ -244,7 +299,7 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
             padding: 0;
             background: #fff; /* Cambiar el fondo a blanco */
             line-height: 150%;
-            font-size: 9pt;
+            font-size: 10pt;
         }}
         .container {{
             width: 100%; /* Asegurarse de que la anchura sea del 100% */
@@ -289,7 +344,7 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
         }}
         .invoice-details table {{
             width: 95%;
-            font-size: 8pt;
+            font-size: 10pt;
             border-collapse: collapse;
         }}
         .invoice-details th, .invoice-details td {{
@@ -317,7 +372,7 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
          .total-table {{
             width: 100%;
             border-collapse: collapse;
-            font-size: 8pt;
+            font-size: 10pt;
         }}
         .total-table th, .total-table td {{
             padding: 7px;
@@ -371,6 +426,14 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
                             <td>Fecha de la factura:</td>
                             <td>{factura_date}</td>
                         </tr>
+                        <tr> 
+                            <td>Término:</td>
+                            <td>Vencimiento a final de mes</td>
+                        </tr>
+                        <tr>
+                            <td>Fecha de la factura:</td>
+                            <td>{end_of_month(date)}</td>
+                        </tr>
                         <!-- Add more rows as needed -->
                     </table>
                 </div>
@@ -381,9 +444,9 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
                         <tr>
                             <th>#</th>
                             <th>Descripción</th>
-                            <th>Nº de trabajadores</th>
+                           <!-- <th>Cantidad</th> -->
                             <th>Precio (€)</th>
-                            <th>Total (€)</th>
+                          <!--  <th>Total (€)</th> -->
                         </tr>
                     </thead>
                     <tbody>
@@ -403,11 +466,11 @@ def generate_pdf(invoice_id, customer, services, total_amount, save_path):
                         </tr>
                         <tr>
                             <td>IVA (21%):</td>
-                            <td>{total_amount * 0.21} €</td>
+                            <td>{round(total_amount * 0.21,2)} €</td>
                         </tr>
                         <tr>
                             <td style="font-weight: bold;">Total:</td>
-                            <td>{total_amount * 1.21} €</td>
+                            <td>{round(total_amount * 1.21,2)} €</td>
                         </tr>
                     </table>
                 </div>
@@ -455,7 +518,7 @@ def get_invoice(invoice_id: int):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("""
-    SELECT invoices.id, invoices.customer_id, invoices.amount, invoices.date
+    SELECT invoices.id, invoices.customer_id, invoices.amount, invoices.date, invoices.paid 
     FROM invoices
     WHERE invoices.id = ?
     """, (invoice_id,))
@@ -465,29 +528,55 @@ def get_invoice(invoice_id: int):
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     c.execute("""
-    SELECT id, invoice_id, description, workers, price, total
+    SELECT id, invoice_id, description, quantity, price, total
     FROM invoice_services
     WHERE invoice_id = ?
     """, (invoice_id,))
     services = c.fetchall()
     conn.close()
 
-    service_list = [Service(id=s[0], invoice_id=s[1], description=s[2], workers=s[3], price=s[4], total=s[5]) for s in services]
+    service_list = [Service(id=s[0], invoice_id=s[1], description=s[2], quantity=s[3], price=s[4], total=s[5]) for s in services]
+
+    # Convertir la fecha de cadena a datetime
+    invoice_date = datetime.strptime(invoice[3], "%Y-%m-%d")
 
     return Invoice(
         id=invoice[0],
         customer_id=invoice[1],
         services=service_list,
         amount=invoice[2],
+        paid=invoice[4],
+        date=invoice_date  # Enviar la fecha como datetime
     )
 
+@app.put('/update_invoice_payment/{invoice_id}')
+def update_invoice_payment(invoice_id: int):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # Obtener el estado actual de 'paid'
+    c.execute("SELECT paid FROM invoices WHERE id = ?", (invoice_id,))
+    current_status = c.fetchone()
+    
+    if current_status is None:
+        conn.close()
+        return {"status": "error", "message": "Invoice not found"}, 404
+    
+    # Alternar el estado de 'paid'
+    new_status = not current_status[0]
+    c.execute("UPDATE invoices SET paid = ? WHERE id = ?", (new_status, invoice_id))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"status": "success", "invoice_id": invoice_id, "new_paid_status": new_status}
 
 @app.get('/get_invoices')
 def get_invoices():
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("""
-    SELECT invoices.id, customers.name, invoices.amount, invoices.date 
+    SELECT invoices.id, customers.name, invoices.amount, invoices.date, invoices.paid 
     FROM invoices 
     JOIN customers ON invoices.customer_id = customers.id
     """)
@@ -498,7 +587,8 @@ def get_invoices():
     return [{"id": f"FAC-{str(invoice[0]).zfill(10)}", 
              "customer": invoice[1], 
              "value": invoice[2], 
-             "date": invoice[3]} 
+             "date": invoice[3],
+             "paid": invoice[4]} 
             for invoice in invoices]
 
 @app.put('/update_customer')
@@ -554,7 +644,15 @@ def delete_customer(customer_id: int):
     conn.close()
     return {"status": "success"}
 
+def copy_db_if_not_exists():
+    if not os.path.exists(db_path):
+        shutil.copyfile(source_db_path, db_path)
+        print(f"Base de datos copiada a {db_path}")
+    else:
+        print("La base de datos ya existe en el destino.")
+
 if __name__ == '__main__':
+    copy_db_if_not_exists()
     init_db()
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    uvicorn.run(app, host='127.0.0.1', port=8520)

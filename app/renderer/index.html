@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Generador de Facturas</title>
+  <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="node_modules/bootstrap-table/dist/bootstrap-table.min.css">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -55,6 +57,14 @@
       display: flex;
       flex-direction: column;
     }
+    input[type="checkbox"]:checked {
+            background-color: #ccc;
+            border: 1px solid #aaa;
+        }
+
+        input[type="checkbox"]:disabled {
+            opacity: 0.5; /* Cambia la opacidad para que se vea deshabilitado */
+        }
 
     form label {
       margin-top: 10px;
@@ -116,26 +126,36 @@
       <div id="create-invoice" class="section">
         <h2>Generar Factura</h2>
         <form id="invoice-form">
-          <div>
-            <label for="customer-select">Seleccionar Cliente:</label>
-            <select id="customer-select" required></select>
-          </div>
-          
-          
-          <div id="services-container">
-            <h3>Servicios</h3>
-            <!-- Aquí se agregarán las filas de los servicios -->
-            <div class="service-row">
-              <input type="text" class="service-description" placeholder="Descripción del servicio" required>
-              <input type="number" class="service-workers" placeholder="Nº de trabajadores" required>
-              <input type="number" class="service-price" placeholder="Precio por trabajador (€)" required>
-              <button type="button" class="remove-service-btn">Eliminar</button>
+            <div>
+                <label for="customer-select">Seleccionar Cliente:</label>
+                <select id="customer-select" required></select>
             </div>
-          </div>
-          <button type="button" id="add-service-btn">+ Agregar Servicio</button>
-          <button type="submit">Generar Factura</button>
+            
+            <!-- Nuevo campo de fecha -->
+            <div>
+                <label for="invoice-date">Fecha de la Factura:</label>
+                <input type="date" id="invoice-date" required>
+            </div>
+            <script>
+              // Establecer la fecha de hoy en el campo de fecha por defecto
+              document.getElementById('invoice-date').value = new Date().toISOString().split('T')[0];
+          </script>
+    
+            <div id="services-container">
+                <h3>Servicios</h3>
+                <!-- Aquí se agregarán las filas de los servicios -->
+                <div class="service-row">
+                    <input type="text" class="service-description" placeholder="Descripción del servicio" required>
+                    <input type="number" class="service-quantity" value="1" placeholder="Cantidad" required disabled>
+                    <input type="number" class="service-price" placeholder="Precio (€)" step="0.01" required>
+                    <button type="button" class="remove-service-btn">Eliminar</button>
+                </div>
+            </div>
+            <button type="button" id="add-service-btn">+ Agregar Servicio</button>
+            <button type="submit">Generar Factura</button>
         </form>
-      </div>
+    </div>
+    
       
       <div id="view-clients" class="section">
         <h2>Ver Todos los Clientes</h2>
@@ -174,54 +194,80 @@
       </div>
       <div id="view-invoices" class="section">
         <h2>Ver Facturas Emitidas</h2>
-        <table id="invoices-table">
-          <thead>
-              <tr>
-                  <th>ID</th>
-                  <th>Cliente</th>
-                  <th>Valor (€)</th>
-                  <th>Fecha</th>
-                  <th>Acciones</th>
-              </tr>
-          </thead>
-          <tbody>
-              <!-- Las filas de las facturas se añadirán aquí -->
-          </tbody>
-      </table>
-      
+        <div id="payment-filter">
+          <label for="filter-paid-status">Filtrar por estado de pago:</label>
+          <select id="filter-paid-status">
+              <option value="all">Todos</option>
+              <option value="paid">Pagado</option>
+              <option value="unpaid">Impago</option>
+          </select>
+      </div>
+        <table id="invoices-table"
+       data-toggle="table"
+       data-height="460"
+       data-pagination="true"
+       data-filter-control="true">
+    <thead>
+        <tr>
+            <th data-field="pagado">Pagado</th>
+            <th data-field="id">ID</th>
+            <th data-field="customer">Cliente</th>
+            <th data-field="value">Valor (€)</th>
+            <th data-field="date">Fecha</th>
+            <th data-field="acciones">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Las filas se añadirán aquí dinámicamente -->
+    </tbody>
+</table>
+
       </div>
       <div id="edit-invoice" class="section">
         <h2>Editar Factura</h2>
         <form id="edit-invoice-form">
-          <input type="hidden" id="edit-invoice-id">
+            <input type="hidden" id="edit-invoice-id">
       
-          <div>
-            <label for="edit-invoice-customer">Cliente:</label>
-            <input type="text" id="edit-invoice-customer" disabled>
-            <input type="text" id="edit-invoice-customer-id" disabled>
-          </div>
+            <div>
+                <label for="edit-invoice-customer">Cliente:</label>
+                <input type="text" id="edit-invoice-customer" disabled>
+                <input type="text" id="edit-invoice-customer-id" disabled>
+            </div>
+    
+            <!-- Nuevo campo de fecha -->
+            <div>
+                <label for="edit-invoice-date">Fecha de la Factura:</label>
+                <input type="date" id="edit-invoice-date" required>
+            </div>
       
-          <div>
-            <label for="edit-invoice-amount">Valor Total:</label>
-            <input type="number" id="edit-invoice-amount" disabled>
-          </div>
+            <div>
+                <label for="edit-invoice-amount">Valor Total:</label>
+                <input type="number" id="edit-invoice-amount" disabled>
+            </div>
       
-          <h3>Servicios</h3>
-          <div id="edit-services-container">
-            <!-- Aquí se insertarán los servicios existentes -->
-          </div>
-          
-          <button type="button" id="edit-add-service-btn">Añadir Servicio</button>
+            <h3>Servicios</h3>
+            <div id="edit-services-container">
+                <!-- Aquí se insertarán los servicios existentes -->
+            </div>
+            
+            <button type="button" id="edit-add-service-btn">Añadir Servicio</button>
       
-          <div>
-            <button type="submit">Guardar Cambios</button>
-          </div>
+            <div>
+                <button type="submit">Guardar Cambios</button>
+            </div>
         </form>
-      </div>
+    </div>
+    
       
     
     </main>
   </div>
   <script src="renderer.js"></script>
+    <!-- jQuery -->
+    <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <!-- Bootstrap Bundle JS -->
+    <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap Table JS -->
+    <script src="node_modules/bootstrap-table/dist/bootstrap-table.min.js"></script>
 </body>
 </html>
