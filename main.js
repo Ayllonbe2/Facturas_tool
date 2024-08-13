@@ -215,6 +215,17 @@ function setupIpcHandlers() {
     loadCustomers();
   });
 
+  ipcMain.on('get-last-invoice-id', (event) => {
+    request.get('http://127.0.0.1:8520/get_last_invoice_id', (error, res, body) => {
+        if (error) {
+            console.error('Error fetching last invoice ID:', error);
+            return;
+        }
+        const lastInvoiceId = JSON.parse(body).last_invoice_id;
+        event.reply('last-invoice-id', { last_invoice_id: lastInvoiceId });
+    });
+});
+
   ipcMain.on('load-all-customers', (event) => {
     console.log('Sending load-all-customers request');
     request.get('http://127.0.0.1:8520/get_customers', (error, res, body) => {
@@ -250,6 +261,16 @@ function setupIpcHandlers() {
       mainWindow.webContents.send('customer-data', customer);
     });
   });
+
+  ipcMain.on('delete-invoice', (event, invoiceId) => {
+    request.delete(`http://127.0.0.1:8520/delete_invoice/${invoiceId}`, (error, res, body) => {
+        if (error) {
+            console.error('Error deleting invoice:', error);
+            return;
+        }
+        mainWindow.webContents.send('invoice-deleted');
+    });
+});
 
   ipcMain.on('update-customer', (event, customer) => {
     console.log('Sending update-customer request:', customer);

@@ -189,6 +189,7 @@ function regenerateInvoice(invoiceId) {
 
 function editInvoice(invoiceId) {
     ipcRenderer.send('get-invoice', invoiceId);
+
     ipcRenderer.once('invoice-data', (invoice) => {
         document.getElementById('edit-invoice-id').value = invoice.id;
         document.getElementById('edit-invoice-customer-id').value = invoice.customer_id;
@@ -198,7 +199,7 @@ function editInvoice(invoiceId) {
         ipcRenderer.once('customer-data', (customer) => {
             document.getElementById('edit-invoice-customer').value = customer.name;
         });
-       
+
         // Asignar la fecha al campo de fecha
         if (invoice.date) {
             const date = new Date(invoice.date);
@@ -234,9 +235,40 @@ function editInvoice(invoiceId) {
 
         document.getElementById('edit-invoice-amount').value = totalAmount.toFixed(2); // Mostrar el monto total
 
+        // Verificar si esta factura es la última generada
+        ipcRenderer.send('get-last-invoice-id');
+        
+        ipcRenderer.once('last-invoice-id', (lastInvoiceId) => {
+            console.log(`ID de la última factura: ${lastInvoiceId.last_invoice_id}`);  // Debugging
+            console.log(`ID de la factura actual: ${invoice.id}`);  // Debugging
+            
+            const deleteButton = document.getElementById('delete-invoice-btn');
+            if (parseInt(invoice.id) === parseInt(lastInvoiceId.last_invoice_id)) {
+                deleteButton.style.display = 'block'; // Mostrar el botón de eliminar
+                deleteButton.onclick = () => {
+                    if (confirm(`¿Estás seguro de que deseas eliminar la factura con ID: ${invoice.id}?`)) {
+                        ipcRenderer.send('delete-invoice', invoice.id);
+                    }
+                };
+            } else {
+                deleteButton.style.display = 'none'; // Ocultar el botón de eliminar
+            }
+        });
+
         showSection('edit-invoice'); // Asegúrate de que tienes esta sección en tu HTML
     });
 }
+
+// Recibir el último ID de factura desde el backend
+ipcRenderer.receive('last-invoice-id', (id) => {
+    return id;
+});
+
+// Manejar la eliminación de facturas
+ipcRenderer.on('invoice-deleted', () => {
+    showSection('view-invoices');
+    viewAllInvoices(); // Recargar la lista de facturas después de la eliminación
+});
 
 function toggleInvoicePaid(invoiceId) {
     fetch(`http://127.0.0.1:8520/update_invoice_payment/${invoiceId}`, {

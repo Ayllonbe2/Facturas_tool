@@ -513,6 +513,8 @@ def get_customers():
     conn.close()
     return [{"id": customer[0], "name": customer[1], "address": customer[2], "city": customer[3], "postal_code": customer[4], "country": customer[5], "cif": customer[6], "phone": customer[7], "email": customer[8]} for customer in customers]
 
+
+
 @app.get('/get_invoice/{invoice_id}', response_model=Invoice)
 def get_invoice(invoice_id: int):
     conn = sqlite3.connect(db_path)
@@ -633,6 +635,29 @@ def get_customer_by_id(customer_id):
     customer = c.fetchone()
     conn.close()
     return customer
+
+@app.delete('/delete_invoice/{invoice_id}')
+def delete_invoice(invoice_id: int):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # Verifica que la factura existe
+    c.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
+    invoice = c.fetchone()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Elimina los servicios asociados a la factura
+    c.execute("DELETE FROM invoice_services WHERE invoice_id = ?", (invoice_id,))
+    
+    # Elimina la factura
+    c.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"status": "success"}
+
 
 @app.delete('/delete_customer/{customer_id}')
 def delete_customer(customer_id: int):

@@ -57,6 +57,23 @@
       display: flex;
       flex-direction: column;
     }
+    .btn-delete {
+    background-color: red; /* Color de fondo rojo */
+    color: white; /* Texto en blanco */
+    border: none; /* Sin borde */
+    padding: 10px 20px; /* Espaciado interno del botón */
+    font-size: 16px; /* Tamaño de fuente */
+    cursor: pointer; /* Cambia el cursor al pasar por encima */
+    border-radius: 5px; /* Bordes redondeados */
+}
+
+.btn-delete:hover {
+    background-color: darkred; /* Un tono más oscuro de rojo al pasar el ratón */
+}
+
+.btn-delete:active {
+    background-color: #a00000; /* Color más oscuro cuando se hace clic */
+}
     input[type="checkbox"]:checked {
             background-color: #ccc;
             border: 1px solid #aaa;
@@ -251,10 +268,11 @@
             </div>
             
             <button type="button" id="edit-add-service-btn">Añadir Servicio</button>
-      
+            
             <div>
                 <button type="submit">Guardar Cambios</button>
             </div>
+            <button type="button" id="delete-invoice-btn" style="display:none;">Eliminar Factura</button>
         </form>
     </div>
     
