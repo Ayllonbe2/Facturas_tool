@@ -10,83 +10,91 @@
         "build": "electron-builder --win"
     },
     "build": {
-    "appId": "com.acanata.id",
-    "productName": "AcanataCRM",
-    "files": [
-        "app/**/*",
-        "main.js",
-        "preload.js",
-        "node_modules/**/*",
-        "loading.html",
-        "app/main/invoices.db"
-    ],
-    "extraResources": [
-        {
-            "from": "app/main",
-            "to": "app/main",
-            "filter": [
-                "**/*"
-            ]
-        },
-        {
-            "from": "app/python",
-            "to": "app/python",
-            "filter": [
-                "**/*"
-            ]
-        },
-        {
-            "from": "app/assets",
-            "to": "app/assets",
-            "filter": [
-                "**/*"
-            ]
-        },
-        {
-            "from": "app/renderer",
-            "to": "app/renderer",
-            "filter": [
-                "**/*"
-            ]
-        }
-    ],
-    "win": {
-        "target": [
+        "appId": "com.acanata.id",
+        "productName": "AcanataCRM",
+        "files": [
+            "app/**/*",
+            "main.js",
+            "dist/main.exe",
+            "preload.js",
+            "node_modules/**/*",
+            "loading.html"
+        ],
+        "extraResources": [
             {
-                "target": "nsis",
-                "arch": [
-                    "x64"
+                "from": "dist/",
+                "to": "dist/",
+                "filter": [
+                    "main.exe"
                 ]
             },
             {
-                "target": "portable",
-                "arch": [
-                    "x64"
+                "from": "app/main",
+                "to": "app/main",
+                "filter": [
+                    "**/*"
+                ]
+            },
+            {
+                "from": "app/assets",
+                "to": "app/assets",
+                "filter": [
+                    "**/*"
+                ]
+            },
+            {
+                "from": "app/renderer",
+                "to": "app/renderer",
+                "filter": [
+                    "**/*"
                 ]
             }
         ],
-        "icon": "app/assets/icono.ico"
-    },
-    "portable": {
-        "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
-    },
-    "nsis": {
-        "oneClick": false,
-        "allowElevation": true,
-        "allowToChangeInstallationDirectory": true,
-        "installerIcon": "app/assets/icono.ico",
-        "uninstallerIcon": "app/assets/icono.ico",
-        "installerHeaderIcon": "app/assets/icono.ico",
-        "createDesktopShortcut": true,
-        "createStartMenuShortcut": true,
-        "shortcutName": "AcanataCRM"
-    },
-    "publish": [
-        {
-            "provider": "github",
-            "owner": "Ayllonbe",
-            "repo": "Facturas_tool"
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "app/assets/icono.ico"
+        },
+        "portable": {
+            "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowElevation": true,
+            "allowToChangeInstallationDirectory": true,
+            "installerIcon": "app/assets/icono.ico",
+            "uninstallerIcon": "app/assets/icono.ico",
+            "installerHeaderIcon": "app/assets/icono.ico",
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "AcanataCRM"
         }
-    ]
-}
+    },
+    "dependencies": {
+        "bootstrap": "^5.3.3",
+        "bootstrap-table": "^1.23.2",
+        "child_process": "^1.0.2",
+        "conveyor": "^0.0.3",
+        "express": "^4.19.2",
+        "fs": "^0.0.1-security",
+        "jquery": "^3.7.1",
+        "path": "^0.12.7",
+        "request": "^2.88.2"
+    },
+    "devDependencies": {
+        "electron": "^31.3.1",
+        "electron-builder": "^24.13.3"
+    }
 }

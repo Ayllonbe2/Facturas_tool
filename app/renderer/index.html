@@ -110,6 +110,7 @@
   </style>
 </head>
 <body>
+ 
   <div class="wrapper">
     <nav class="sidebar">
       <ul>
@@ -121,6 +122,9 @@
       </ul>
     </nav>
     <main class="content">
+      <div id="notification" style="display: none; background-color: #f44336; color: white; padding: 15px; position: fixed; top: 20px; right: 20px; z-index: 1000; border-radius: 5px;">
+        <span id="notification-message"></span>
+    </div>
       <h1>Generador de Facturas</h1>
       <div id="home" class="section">
         <h2>Bienvenido al Generador de Facturas</h2>
@@ -274,6 +278,11 @@
             </div>
             <button type="button" id="delete-invoice-btn" style="display:none;">Eliminar Factura</button>
         </form>
+        <div id="confirm-dialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); z-index: 1000;">
+          <p id="confirm-message"></p>
+          <button id="confirm-yes-btn">Aceptar</button>
+          <button id="confirm-no-btn">Cancelar</button>
+      </div>
     </div>
     
       

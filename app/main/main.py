@@ -1,4 +1,5 @@
 import os
+import sys
 import sqlite3
 from weasyprint import HTML
 from fastapi import FastAPI, HTTPException, Request
@@ -25,7 +26,22 @@ log_path = os.path.join(os.path.dirname(__file__), 'logs', 'app.log')
 logging.basicConfig(filename=log_path, level=logging.DEBUG)
 
 app = FastAPI()
-
+db_path = ""
+logo_path=""
+if hasattr(sys, '_MEIPASS'):
+    # Estamos en un entorno empaquetado
+    print("Location for main.py and python.exe package:",sys._MEIPASS)
+    db_path = os.path.abspath(os.path.join(sys.executable, '..','..', 'app', 'main', 'invoices.db'))
+    logo_path = os.path.abspath(os.path.join(sys.executable, '..','..', 'app', 'assets', 'acanata.png'))
+    print("Location database:", db_path)
+else:
+    
+    init_path = os.path.dirname(__file__)
+    db_path = os.path.join(os.path.dirname(__file__),'invoices.db')
+    logo_path = os.path.join(init_path, '..', 'assets', 'acanata.png')
+    print("Location for main.py unpackage:",init_path)
+    print("Location database:", db_path)
+logo_path = os.path.normpath(logo_path)
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
@@ -36,11 +52,8 @@ app.add_middleware(
 )
 
 
-# Ruta de la base de datos en la instalación
-source_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'invoices.db')
 
 # Ruta de la base de datos en el directorio de datos de la aplicación
-db_path = os.path.join(os.getenv('APPDATA'), 'AcanataCRM', 'main', 'invoices.db')
 
 # Asegurarse de que el directorio de destino exista
 os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -252,14 +265,8 @@ def get_customer_by_id(customer_id):
 
 def generate_pdf(invoice_id, date, customer, services, total_amount, save_path):
     formatted_invoice_id = str(invoice_id).zfill(10)
-    # Obtener la ruta al directorio donde se encuentra el script actual (app/main/)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Construir la ruta absoluta al archivo logo (subir un nivel y luego entrar en assets/)
-    logo_path = os.path.join(current_dir, '..', 'assets', 'acanata.png')
-
     # Normalizar la ruta para asegurarte de que funcione en todos los sistemas operativos
-    logo_path = os.path.normpath(logo_path)
+    
     # Insert logo as base64 string in the PDF
     with open(logo_path, "rb") as image_file:
         encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
@@ -669,15 +676,8 @@ def delete_customer(customer_id: int):
     conn.close()
     return {"status": "success"}
 
-def copy_db_if_not_exists():
-    if not os.path.exists(db_path):
-        shutil.copyfile(source_db_path, db_path)
-        print(f"Base de datos copiada a {db_path}")
-    else:
-        print("La base de datos ya existe en el destino.")
 
 if __name__ == '__main__':
-    copy_db_if_not_exists()
     init_db()
     import uvicorn
     uvicorn.run(app, host='127.0.0.1', port=8520)

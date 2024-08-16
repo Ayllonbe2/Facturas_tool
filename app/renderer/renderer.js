@@ -6,6 +6,19 @@ document.addEventListener('DOMContentLoaded', function() {
     showSection('home');
 });
 
+function showNotification(message) {
+    const notification = document.getElementById('notification');
+    const notificationMessage = document.getElementById('notification-message');
+
+    notificationMessage.textContent = message;
+    notification.style.display = 'block';
+
+    // Ocultar la notificación después de 3 segundos
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 3000);
+}
+
 // Manejar el formulario para agregar clientes
 document.getElementById('customer-form').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -21,11 +34,12 @@ document.getElementById('customer-form').addEventListener('submit', (event) => {
 
     const customerData = { name, address, city, postal_code, country, cif, phone, email };
     if (!/^[ABCDEFGHJKLMNPQRSUVW][0-9]{7}[0-9A-J]$/.test(cif)) {
-        alert("Por favor, ingresa un CIF válido.");
+        showNotification("Por favor, ingresa un CIF válido.");
         return; // No continuar con la ejecución si el CIF no es válido
     }
   
     ipcRenderer.send('add-customer', customerData);
+    document.getElementById('customer-form').reset();
 });
 
 // Manejar la selección del cliente y cargar su información
@@ -43,21 +57,22 @@ document.getElementById('invoice-form').addEventListener('submit', (event) => {
     event.preventDefault();
   
     const customer_id = parseInt(document.getElementById('customer-select').value, 10);
-    const date = document.getElementById('invoice-date').value; // Capturar la fecha
-  
+    let date = document.getElementById('invoice-date').value; // Capturar la fecha
+    date = new Date(date)
     // Recoger los servicios añadidos
     const services = [];
+    let amount = 0.;
     document.querySelectorAll('.service-row').forEach(row => {
         const description = row.querySelector('.service-description').value;
         const quantity = parseInt(row.querySelector('.service-quantity').value, 10);
         const price = parseFloat(row.querySelector('.service-price').value);
         const total = quantity * price;
-  
+        amount =+ total;
         services.push({ description, quantity, price, total });
     });
-  
     // Enviar la factura con los servicios y la fecha al backend
-    ipcRenderer.send('generate-invoice', { customer_id, date, services });
+    ipcRenderer.send('generate-invoice', { customer_id, services, date });
+    document.getElementById('invoice-form').reset();
 });
   
 
@@ -187,6 +202,27 @@ function regenerateInvoice(invoiceId) {
     }
 }
 
+function showConfirmDialog(message, onConfirm, onCancel) {
+    const confirmDialog = document.getElementById('confirm-dialog');
+    const confirmMessage = document.getElementById('confirm-message');
+    const confirmYesBtn = document.getElementById('confirm-yes-btn');
+    const confirmNoBtn = document.getElementById('confirm-no-btn');
+
+    confirmMessage.textContent = message;
+    confirmDialog.style.display = 'block';
+
+    confirmYesBtn.onclick = () => {
+        confirmDialog.style.display = 'none';
+        if (onConfirm) onConfirm(); // Llama a la función onConfirm si se hace clic en "Aceptar"
+    };
+
+    confirmNoBtn.onclick = () => {
+        confirmDialog.style.display = 'none';
+        if (onCancel) onCancel(); // Llama a la función onCancel si se hace clic en "Cancelar"
+    };
+}
+
+
 function editInvoice(invoiceId) {
     ipcRenderer.send('get-invoice', invoiceId);
 
@@ -246,9 +282,15 @@ function editInvoice(invoiceId) {
             if (parseInt(invoice.id) === parseInt(lastInvoiceId.last_invoice_id)) {
                 deleteButton.style.display = 'block'; // Mostrar el botón de eliminar
                 deleteButton.onclick = () => {
-                    if (confirm(`¿Estás seguro de que deseas eliminar la factura con ID: ${invoice.id}?`)) {
-                        ipcRenderer.send('delete-invoice', invoice.id);
-                    }
+                    showConfirmDialog(
+                        `¿Estás seguro de que deseas eliminar la factura con ID: ${invoice.id}?`,
+                        () => {
+                            ipcRenderer.send('delete-invoice', invoice.id); // Función a ejecutar si se confirma
+                        },
+                        () => {
+                            console.log('Eliminación cancelada'); // Función a ejecutar si se cancela
+                        }
+                    );
                 };
             } else {
                 deleteButton.style.display = 'none'; // Ocultar el botón de eliminar
