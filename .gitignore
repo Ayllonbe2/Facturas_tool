@@ -7,3 +7,4 @@ node_modules
 dist
 app/python
 build
+invoices.db

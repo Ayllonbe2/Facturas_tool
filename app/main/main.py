@@ -1,4 +1,5 @@
 import os
+import signal
 import sys
 import sqlite3
 from weasyprint import HTML
@@ -10,8 +11,9 @@ import logging
 import calendar
 from datetime import datetime
 import base64
-import shutil
+#import shutil
 import logging
+import asyncio
 
 # Configurar logging en Python
 logging.basicConfig(filename='app.log', level=logging.DEBUG, 
@@ -248,6 +250,7 @@ def regenerate_invoice(invoice_id: int, request: RegenerateInvoiceRequest):
     generate_pdf(invoice_id, date_invoice, customer, service_list, invoice[2], save_path)
 
     return {"status": "success"}
+
 
 def end_of_month(date: datetime) -> datetime:
     # Obtener el último día del mes
@@ -676,6 +679,18 @@ def delete_customer(customer_id: int):
     conn.close()
     return {"status": "success"}
 
+
+@app.post("/shutdown")
+async def shutdown():
+    pid = os.getpid()
+    asyncio.create_task(graceful_shutdown(pid))
+    return {"message": f"Shutdown signal sent to PID: {pid}"}
+
+async def graceful_shutdown(pid):
+    await asyncio.sleep(2)  # Simular trabajo asincrónico
+    # Aquí iría tu código para cerrar conexiones, limpiar recursos, etc.
+    os.kill(pid, signal.SIGINT)
+    return {"message": "Shutdown signal sent"}
 
 if __name__ == '__main__':
     init_db()

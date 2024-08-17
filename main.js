@@ -367,20 +367,19 @@ function setupIpcHandlers() {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.quit();
+    // Envía una solicitud POST al servidor FastAPI para iniciar el apagado
+    request.post('http://127.0.0.1:8520/shutdown', (error, response, body) => {
+      if (error) {
+        console.error('Failed to shutdown the backend:', error);
+      } else {
+        console.log(`Backend shutdown initiated: ${body}`);
+      }
+      app.quit(); // Cierra la aplicación después de intentar apagar el backend
+    });
   }
 });
 
-app.on('before-quit', () => {
-  killMainProcess();
-});
 
-function killMainProcess() {
-  if (python) {
-    python.kill('SIGINT');
-    console.log('Backend (main.exe) ha sido terminado');
-  }
-}
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
