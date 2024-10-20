@@ -84,12 +84,14 @@ class Service(BaseModel):
     quantity: int
     price: float
     total: float
+    vat: Optional[float] = None  # Porcentaje de IVA para el servicio
 
 class Invoice(BaseModel):
     id: Optional[int] = None  # Este es opcional porque se genera automáticamente en la base de datos
     customer_id: int
     services: List[Service]  # Esta lista contendrá los servicios asociados a la factura
     amount: Optional[float] = None  # Esto se calculará automáticamente en el backend
+    vat: Optional[float] = None  # Porcentaje de IVA para la factura
     paid: Optional[bool] = Field(default=False)  # Campo para saber si está pagado
     date: Optional[datetime] = None  # Campo para la fecha de la factura como datetime
 
@@ -123,6 +125,7 @@ def init_db():
                     id INTEGER PRIMARY KEY, 
                     customer_id INTEGER,
                     amount REAL,
+                    vat REAL,
                     paid BOOLEAN DEFAULT 0,
                     date TEXT DEFAULT (datetime('now','localtime')),
                     FOREIGN KEY(customer_id) REFERENCES customers(id))''')
@@ -135,7 +138,20 @@ def init_db():
                     quantity INTEGER,
                     price REAL,
                     total REAL,
+                    vat REAL,
                     FOREIGN KEY(invoice_id) REFERENCES invoices(id))''')
+    
+    # Añadir columna 'vat' a la tabla 'invoices' si no existe
+    c.execute("PRAGMA table_info(invoices)")
+    columns = [column[1] for column in c.fetchall()]
+    if 'vat' not in columns:
+        c.execute("ALTER TABLE invoices ADD COLUMN vat REAL")
+
+    # Añadir columna 'vat' a la tabla 'invoice_services' si no existe
+    c.execute("PRAGMA table_info(invoice_services)")
+    columns = [column[1] for column in c.fetchall()]
+    if 'vat' not in columns:
+        c.execute("ALTER TABLE invoice_services ADD COLUMN vat REAL")
     
     conn.commit()
     conn.close()
@@ -151,14 +167,14 @@ def generate_invoice(invoice: Invoice):
     c = conn.cursor()
 
     # Insertar factura con la fecha convertida a cadena
-    c.execute("INSERT INTO invoices (customer_id, amount, paid, date) VALUES (?, ?, ?, ?)", 
-              (invoice.customer_id, sum(service.total for service in invoice.services), invoice.paid, date.strftime("%Y-%m-%d")))
+    c.execute("INSERT INTO invoices (customer_id, amount, vat, paid, date) VALUES (?, ?, ?, ?,?)", 
+              (invoice.customer_id, sum(service.total for service in invoice.services), invoice.vat ,invoice.paid, date.strftime("%Y-%m-%d")))
     invoice_id = c.lastrowid
 
     # Insertar servicios asociados a la factura
     for service in invoice.services:
-        c.execute("INSERT INTO invoice_services (invoice_id, description, quantity, price, total) VALUES (?, ?, ?, ?, ?)", 
-                  (invoice_id, service.description, service.quantity, service.price, service.total))
+        c.execute("INSERT INTO invoice_services (invoice_id, description, quantity, price, total, vat) VALUES (?, ?, ?, ?, ?, ?)", 
+                  (invoice_id, service.description, service.quantity, service.price, service.total, service.vat if service.vat is not None else invoice.vat))
 
     conn.commit()
     conn.close()
@@ -177,9 +193,9 @@ def update_invoice(invoice_id: int, invoice: Invoice):
     # Primero, actualizar la tabla de facturas
     c.execute("""
         UPDATE invoices 
-        SET customer_id = ?, amount = ?, paid = ?, date = ? 
+        SET customer_id = ?, amount = ?, vat = ?, paid = ?, date = ? 
         WHERE id = ?
-    """, (invoice.customer_id, invoice.amount, invoice.paid, date_str, invoice_id))
+    """, (invoice.customer_id, invoice.amount, invoice.vat, invoice.paid, date_str, invoice_id))
     
     # Luego, eliminar los servicios existentes asociados a la factura
     c.execute("DELETE FROM invoice_services WHERE invoice_id = ?", (invoice_id,))
@@ -187,9 +203,9 @@ def update_invoice(invoice_id: int, invoice: Invoice):
     # Insertar los nuevos servicios
     for service in invoice.services:
         c.execute("""
-            INSERT INTO invoice_services (invoice_id, description, quantity, price, total) 
-            VALUES (?, ?, ?, ?, ?)
-        """, (invoice_id, service.description, service.quantity, service.price, service.total))
+            INSERT INTO invoice_services (invoice_id, description, quantity, price, total, vat) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (invoice_id, service.description, service.quantity, service.price, service.total, service.vat))
     
     conn.commit()
     conn.close()
@@ -221,7 +237,8 @@ def regenerate_invoice(invoice_id: int, request: RegenerateInvoiceRequest):
     if not invoice:
         conn.close()
         raise HTTPException(status_code=404, detail="Invoice not found")
-
+    invoice_vat = invoice[5]  # Obtener el IVA de la factura
+    
     # Obtener la información del cliente
     customer = get_customer_by_id(invoice[1])
 
@@ -238,7 +255,8 @@ def regenerate_invoice(invoice_id: int, request: RegenerateInvoiceRequest):
             description=service[2],
             quantity=service[3],
             price=service[4],
-            total=service[5]
+            total=service[5],
+            vat = service[6]
         )
         for service in services_data
     ]
@@ -247,7 +265,7 @@ def regenerate_invoice(invoice_id: int, request: RegenerateInvoiceRequest):
     date_invoice = datetime.strptime(invoice[3], '%Y-%m-%d').date()
 
     # Generar el PDF de la factura
-    generate_pdf(invoice_id, date_invoice, customer, service_list, invoice[2], save_path)
+    generate_pdf(invoice_id, date_invoice, customer, service_list, invoice[2], save_path, invoice_vat)
 
     return {"status": "success"}
 
@@ -266,7 +284,7 @@ def get_customer_by_id(customer_id):
     conn.close()
     return customer
 
-def generate_pdf(invoice_id, date, customer, services, total_amount, save_path):
+def generate_pdf(invoice_id, date, customer, services, total_amount, save_path, invoice_vat):
     formatted_invoice_id = str(invoice_id).zfill(10)
     # Normalizar la ruta para asegurarte de que funcione en todos los sistemas operativos
     
@@ -278,17 +296,26 @@ def generate_pdf(invoice_id, date, customer, services, total_amount, save_path):
 
     # Create a string with HTML content
     servicios_html = ""
+    total_vat_amount = 0
+    subtotal = 0
     for i, service in enumerate(services, start=1):
+        service_vat_rate = service.vat if service.vat is not None else invoice_vat
+        print(service.description,service_vat_rate, service.vat)
+        service_vat_amount = service.total * (service_vat_rate / 100)
+        total_with_vat = service.total + service_vat_amount
+        subtotal += service.total
+        total_vat_amount += service_vat_amount
         servicios_html += f"""
         <tr>
             <td>{i}</td>
             <td>{service.description}</td>
-           <!-- <td>{service.quantity}</td> -->
-          <!--  <td>{service.price}</td> -->
-            <td>{service.total}</td>
+            <td>{service.total:.2f} €</td>
+            <td>{service_vat_rate}%</td>
+            <td>{service_vat_amount:.2f} €</td>
+            <td>{total_with_vat:.2f} €</td>
         </tr>
         """
-
+    grand_total = subtotal + total_vat_amount
     # Formatear la fecha actual
     factura_date = date.strftime("%d-%m-%Y")
 
@@ -456,6 +483,9 @@ def generate_pdf(invoice_id, date, customer, services, total_amount, save_path):
                             <th>Descripción</th>
                            <!-- <th>Cantidad</th> -->
                             <th>Precio (€)</th>
+                            <th>IVA (%)</th>
+                            <th>IVA (€)</th>
+                            <th>Total (€)</th>
                           <!--  <th>Total (€)</th> -->
                         </tr>
                     </thead>
@@ -472,15 +502,15 @@ def generate_pdf(invoice_id, date, customer, services, total_amount, save_path):
                     <table class="total-table">
                         <tr>
                             <td>Subtotal:</td>
-                            <td>{total_amount} €</td>
+                            <td>{subtotal:.2f} €</td>
                         </tr>
                         <tr>
-                            <td>IVA (21%):</td>
-                            <td>{round(total_amount * 0.21,2)} €</td>
+                            <td>IVA Total:</td>
+                            <td>{total_vat_amount:.2f} €</td>
                         </tr>
                         <tr>
                             <td style="font-weight: bold;">Total:</td>
-                            <td>{round(total_amount * 1.21,2)} €</td>
+                            <td>{grand_total:.2f} €</td>
                         </tr>
                     </table>
                 </div>
@@ -530,7 +560,7 @@ def get_invoice(invoice_id: int):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("""
-    SELECT invoices.id, invoices.customer_id, invoices.amount, invoices.date, invoices.paid 
+    SELECT invoices.id, invoices.customer_id, invoices.amount, invoices.date, invoices.paid, invoices.vat
     FROM invoices
     WHERE invoices.id = ?
     """, (invoice_id,))
@@ -540,14 +570,14 @@ def get_invoice(invoice_id: int):
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     c.execute("""
-    SELECT id, invoice_id, description, quantity, price, total
+    SELECT id, invoice_id, description, quantity, price, total, vat
     FROM invoice_services
     WHERE invoice_id = ?
     """, (invoice_id,))
     services = c.fetchall()
     conn.close()
 
-    service_list = [Service(id=s[0], invoice_id=s[1], description=s[2], quantity=s[3], price=s[4], total=s[5]) for s in services]
+    service_list = [Service(id=s[0], invoice_id=s[1], description=s[2], quantity=s[3], price=s[4], total=s[5], vat=s[6]) for s in services]
 
     # Convertir la fecha de cadena a datetime
     invoice_date = datetime.strptime(invoice[3], "%Y-%m-%d")
@@ -558,7 +588,8 @@ def get_invoice(invoice_id: int):
         services=service_list,
         amount=invoice[2],
         paid=invoice[4],
-        date=invoice_date  # Enviar la fecha como datetime
+        date=invoice_date,  # Enviar la fecha como datetime
+        vat=invoice[5]
     )
 
 @app.put('/update_invoice_payment/{invoice_id}')
@@ -588,7 +619,7 @@ def get_invoices():
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("""
-    SELECT invoices.id, customers.name, invoices.amount, invoices.date, invoices.paid 
+    SELECT invoices.id, customers.name, invoices.amount, invoices.date, invoices.paid
     FROM invoices 
     JOIN customers ON invoices.customer_id = customers.id
     """)

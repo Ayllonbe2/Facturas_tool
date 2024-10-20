@@ -161,6 +161,10 @@
               // Establecer la fecha de hoy en el campo de fecha por defecto
               document.getElementById('invoice-date').value = new Date().toISOString().split('T')[0];
           </script>
+          <div>
+            <label for="invoice-vat">IVA (%) de la Factura:</label>
+            <input type="number" id="invoice-vat" value="21" placeholder="IVA de la factura (%)" step="0.1" min="0" required>
+          </div>
     
             <div id="services-container">
                 <h3>Servicios</h3>
@@ -169,6 +173,7 @@
                     <input type="text" class="service-description" placeholder="Descripción del servicio" required>
                     <input type="number" class="service-quantity" value="1" placeholder="Cantidad" required disabled>
                     <input type="number" class="service-price" placeholder="Precio (€)" step="0.01" required>
+                    <input type="number" class="service-vat" placeholder="IVA (%) - Default IVA Factura" step="0.1" min="0">
                     <button type="button" class="remove-service-btn">Eliminar</button>
                 </div>
             </div>
@@ -260,6 +265,10 @@
                 <label for="edit-invoice-date">Fecha de la Factura:</label>
                 <input type="date" id="edit-invoice-date" required>
             </div>
+            <div>
+              <label for="edit-invoice-vat">IVA de la Factura (%):</label>
+              <input type="number" id="edit-invoice-vat" step="0.1" min="0" required>
+          </div>
       
             <div>
                 <label for="edit-invoice-amount">Valor Total:</label>

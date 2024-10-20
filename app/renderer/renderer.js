@@ -59,6 +59,7 @@ document.getElementById('invoice-form').addEventListener('submit', (event) => {
     const customer_id = parseInt(document.getElementById('customer-select').value, 10);
     let date = document.getElementById('invoice-date').value; // Capturar la fecha
     date = new Date(date)
+    const vat = parseFloat(document.getElementById('invoice-vat').value);
     // Recoger los servicios añadidos
     const services = [];
     let amount = 0.;
@@ -67,11 +68,13 @@ document.getElementById('invoice-form').addEventListener('submit', (event) => {
         const quantity = parseInt(row.querySelector('.service-quantity').value, 10);
         const price = parseFloat(row.querySelector('.service-price').value);
         const total = quantity * price;
+        const vatInput = row.querySelector('.service-vat').value;
+        const serviceVat =  vatInput !== '' ? parseFloat(vatInput) : null;
         amount =+ total;
-        services.push({ description, quantity, price, total });
+        services.push({ description, quantity, price, total, vat: serviceVat });
     });
     // Enviar la factura con los servicios y la fecha al backend
-    ipcRenderer.send('generate-invoice', { customer_id, services, date });
+    ipcRenderer.send('generate-invoice', { customer_id, services, date, vat });
     document.getElementById('invoice-form').reset();
 });
   
@@ -102,6 +105,7 @@ document.getElementById('add-service-btn').addEventListener('click', () => {
         <input type="text" class="service-description" placeholder="Descripción del servicio" required>
         <input type="number" class="service-quantity" value=1 placeholder="Cantidad" required disabled>
         <input type="number" class="service-price" placeholder="Precio (€)" step="0.01" required>
+        <input type="number" class="service-vat" placeholder="IVA (%) - Default IVA Factura" step="0.1" min="0">
         <button type="button" class="remove-service-btn">Eliminar</button>
     `;
   
@@ -118,6 +122,7 @@ document.getElementById('edit-add-service-btn').addEventListener('click', () => 
         <input type="text" class="service-description" placeholder="Descripción del servicio" required>
         <input type="number" class="service-quantity" value=1 placeholder="Cantidad" required disabled>
         <input type="number" class="service-price" placeholder="Precio (€)" step="0.01" required>
+        <input type="number" class="service-vat" placeholder="IVA (%)" step="0.1" min="0">
         <button type="button" class="edit-remove-service-btn">Eliminar</button>
     `;
 
@@ -129,6 +134,12 @@ document.addEventListener('click', (event) => {
     if (event.target.classList.contains('remove-service-btn')) {
         event.target.closest('.service-row').remove();
         updateTotalAmount(); // Recalcular el total después de eliminar un servicio
+    }
+});
+
+document.addEventListener('input', (event) => {
+    if (event.target.classList.contains('service-price') || event.target.classList.contains('service-quantity')) {
+        updateTotalAmount();
     }
 });
 
@@ -246,6 +257,7 @@ function editInvoice(invoiceId) {
             ].join('-');  // Formatear manualmente a YYYY-MM-DD
             document.getElementById('edit-invoice-date').value = formattedDate;
         }
+        document.getElementById('edit-invoice-vat').value = (invoice.vat !== null && invoice.vat !== undefined) ? invoice.vat : '';
 
         const servicesContainer = document.getElementById('edit-services-container');
         servicesContainer.innerHTML = ''; // Limpiar los servicios actuales
@@ -262,6 +274,7 @@ function editInvoice(invoiceId) {
                 <input type="text" class="service-description" value="${service.description}" required>
                 <input type="number" class="service-quantity" value="${service.quantity}" required disabled>
                 <input type="number" class="service-price" value="${service.price}" step="0.01" required>
+                <input type="number" class="service-vat" value="${service.vat}" placeholder="IVA (%)" step="0.1">
                 <input type="number" class="service-total" value="${service.total}" readonly>
                 <button type="button" class="edit-remove-service-btn">Eliminar</button>
             `;
@@ -411,7 +424,10 @@ document.addEventListener('click', (event) => {
 function updateTotalAmount() {
     let totalAmount = 0;
     document.querySelectorAll('.edit-service-row').forEach(row => {
-        const total = parseFloat(row.querySelector('.service-total').value);
+        const quantity = parseInt(row.querySelector('.service-quantity').value, 10);
+        const price = parseFloat(row.querySelector('.service-price').value);
+        const total = quantity * price;
+        row.querySelector('.service-total').value = total.toFixed(2);
         totalAmount += total;
     });
     document.getElementById('edit-invoice-amount').value = totalAmount.toFixed(2);
@@ -422,7 +438,10 @@ document.getElementById('edit-invoice-form').addEventListener('submit', (event) 
   
     const id = parseInt(document.getElementById('edit-invoice-id').value.replace('FAC-', ''), 10);
     const customer_id = parseInt(document.getElementById('edit-invoice-customer-id').value, 10);
-    const date = new Date(document.getElementById('edit-invoice-date').value); // Capturar la fecha
+    const date = new Date(document.getElementById('edit-invoice-date').value);
+
+    // Capturar el IVA de la factura
+    const vat = parseFloat(document.getElementById('edit-invoice-vat').value) || null;
   
     const services = [];
     let amount = 0;
@@ -430,19 +449,23 @@ document.getElementById('edit-invoice-form').addEventListener('submit', (event) 
         const description = row.querySelector('.service-description').value;
         const quantity = parseInt(row.querySelector('.service-quantity').value, 10);
         const price = parseFloat(row.querySelector('.service-price').value);
+        const vatInput = row.querySelector('.service-vat').value;
+        console.log(vatInput !== '' ? parseFloat(vatInput) : null)
+        const serviceVat =  vatInput !== '' ? parseFloat(vatInput) : null;
         const total = quantity * price;
-        amount = amount + total;
-        services.push({ description, quantity, price, total });
+        amount += total;
+        services.push({ description, quantity, price, total, vat: serviceVat });
     });
   
-    const updatedInvoice = { id, customer_id, date, amount, services };
+    const updatedInvoice = { id, customer_id, date, amount, vat, services };
   
     ipcRenderer.send('update-invoice', updatedInvoice);
   
     ipcRenderer.once('invoice-updated', () => {
-        showSection('view-invoices'); // Navegar de vuelta a la vista de facturas
+        showSection('view-invoices');
     });
 });
+
 
 // Manejar el formulario para editar clientes
 document.getElementById('edit-customer-form').addEventListener('submit', (event) => {

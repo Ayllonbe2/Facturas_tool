@@ -138,7 +138,8 @@ function setupIpcHandlers() {
         json: {
             customer_id: arg.customer_id,
             services: arg.services,
-            date: arg.date
+            date: arg.date,
+            vat: arg.vat
         }
     }, (error, res, body) => {
         if (error) {
@@ -290,15 +291,15 @@ function setupIpcHandlers() {
   ipcMain.on('update-invoice', (event, invoice) => {
     console.log('Invoice data being sent for update:', invoice);
     request.put(`http://127.0.0.1:8520/update_invoice/${invoice.id}`, {
-      json: invoice,
+        json: invoice,
     }, (error, res, body) => {
-      if (error) {
-        console.error('Error updating invoice:', error);
-        return;
-      }
-      mainWindow.webContents.send('invoice-updated');
+        if (error) {
+            console.error('Error updating invoice:', error);
+            return;
+        }
+        mainWindow.webContents.send('invoice-updated');
     });
-  });
+});
 
   ipcMain.on('update-invoice-payment', (event, invoiceId) => {
     console.log(`Toggling payment status for invoice ID ${invoiceId}`);
