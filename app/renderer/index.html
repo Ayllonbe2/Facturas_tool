@@ -5,109 +5,8 @@
   <title>Generador de Facturas</title>
   <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="node_modules/bootstrap-table/dist/bootstrap-table.min.css">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-
-    .wrapper {
-      display: flex;
-    }
-
-    .sidebar {
-      width: 250px;
-      background-color: #333;
-      color: white;
-      height: 100vh;
-      padding: 15px;
-      box-sizing: border-box;
-    }
-
-    .sidebar ul {
-      list-style-type: none;
-      padding: 0;
-    }
-
-    .sidebar ul li {
-      margin-bottom: 10px;
-    }
-
-    .sidebar ul li a {
-      color: white;
-      text-decoration: none;
-    }
-
-    .content {
-      flex: 1;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-
-    .section {
-      display: none;
-    }
-
-    .section.active {
-      display: block;
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-    }
-    .btn-delete {
-    background-color: red; /* Color de fondo rojo */
-    color: white; /* Texto en blanco */
-    border: none; /* Sin borde */
-    padding: 10px 20px; /* Espaciado interno del botón */
-    font-size: 16px; /* Tamaño de fuente */
-    cursor: pointer; /* Cambia el cursor al pasar por encima */
-    border-radius: 5px; /* Bordes redondeados */
-}
-
-.btn-delete:hover {
-    background-color: darkred; /* Un tono más oscuro de rojo al pasar el ratón */
-}
-
-.btn-delete:active {
-    background-color: #a00000; /* Color más oscuro cuando se hace clic */
-}
-    input[type="checkbox"]:checked {
-            background-color: #ccc;
-            border: 1px solid #aaa;
-        }
-
-        input[type="checkbox"]:disabled {
-            opacity: 0.5; /* Cambia la opacidad para que se vea deshabilitado */
-        }
-
-    form label {
-      margin-top: 10px;
-    }
-
-    form input, form select, form button {
-      margin-top: 5px;
-      padding: 8px;
-      font-size: 16px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-
-    table, th, td {
-      border: 1px solid #ddd;
-    }
-
-    th, td {
-      padding: 10px;
-      text-align: left;
-    }
-  </style>
+  <link rel="stylesheet" href="css/index.css">
+ 
 </head>
 <body>
  
@@ -298,7 +197,7 @@
     
     </main>
   </div>
-  <script src="renderer.js"></script>
+  <script type="module" src="renderer.js"></script>
     <!-- jQuery -->
     <script src="node_modules/jquery/dist/jquery.min.js"></script>
     <!-- Bootstrap Bundle JS -->

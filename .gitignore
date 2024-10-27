@@ -1,4 +1,3 @@
-invoice*
 *.pdf
 template.pdf
 app/main/invoices.db
